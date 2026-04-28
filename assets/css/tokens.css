@@ -1,0 +1,58 @@
+/*
+ * AsteraHR ERP — Design Tokens  (assets/css/tokens.css)
+ * Single source of truth for all CSS variables.
+ * Import this first in every page.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  /* ── Brand colours ── */
+  --navy:      #0F2249;
+  --navy-d:    #091830;
+  --navy-m:    #1a3560;
+  --navy-l:    #1F3C88;
+  --gold:      #C8960C;
+  --gold-b:    #F4B400;
+  --gold-p:    #F9E4A0;
+  --green:     #006B42;
+  --green-l:   #008753;
+
+  /* ── Neutrals ── */
+  --white:     #FFFFFF;
+  --cream:     #FAFAF7;
+  --parch:     #F3F1EC;
+  --ink:       #0A1628;
+  --ink-m:     #2C3E5D;
+  --ink-s:     #5A6B85;
+  --ink-mu:    #8A9BB5;
+  --ink-g:     #B8C4D4;
+  --bdr:       #DDE3EE;
+  --bdr-s:     #EEF1F7;
+
+  /* ── Semantic ── */
+  --red:       #B91C1C;
+  --red-p:     rgba(185,28,28,.08);
+
+  /* ── Shadows ── */
+  --sh-d:  0 24px 64px rgba(10,22,40,.22), 0 4px 16px rgba(10,22,40,.12);
+  --sh-c:  0 2px 12px rgba(10,22,40,.08);
+  --sh-l:  0 8px 32px rgba(10,22,40,.14), 0 2px 8px rgba(10,22,40,.08);
+
+  /* ── Radii ── */
+  --r-sm:  6px;
+  --r:     8px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+
+  /* ── Typography ── */
+  --f-serif: 'Cormorant Garamond', Georgia, serif;
+  --f-ui:    'Outfit', system-ui, sans-serif;
+  --f-mono:  'JetBrains Mono', monospace;
+
+  /* ── Layout ── */
+  --sidebar-w:   256px;
+  --header-h:    58px;
+  --timeout-ms:  1800000; /* 30 min in ms — read by JS */
+}

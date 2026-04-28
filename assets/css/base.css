@@ -1,0 +1,113 @@
+/*
+ * AsteraHR ERP — Base Styles  (assets/css/base.css)
+ * Reset · Typography · Utility classes · Animations
+ */
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--f-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--cream);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+a    { color: inherit; text-decoration: none; }
+img  { display: block; max-width: 100%; }
+ul   { list-style: none; }
+button { cursor: pointer; font-family: var(--f-ui); }
+input, select, textarea { font-family: var(--f-ui); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--bdr); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-g); }
+* { scrollbar-width: thin; scrollbar-color: var(--bdr) transparent; }
+
+/* ── Selection ── */
+::selection { background: rgba(31,60,136,.15); color: var(--navy); }
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid var(--navy-l);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Typography helpers ── */
+.t-serif { font-family: var(--f-serif); }
+.t-mono  { font-family: var(--f-mono); }
+.t-ui    { font-family: var(--f-ui); }
+
+/* ── Colour helpers ── */
+.c-ink    { color: var(--ink); }
+.c-mid    { color: var(--ink-m); }
+.c-soft   { color: var(--ink-s); }
+.c-muted  { color: var(--ink-mu); }
+.c-ghost  { color: var(--ink-g); }
+.c-navy   { color: var(--navy-l); }
+.c-gold   { color: var(--gold); }
+.c-green  { color: var(--green-l); }
+.c-red    { color: var(--red); }
+
+/* ── Display helpers ── */
+.hidden  { display: none !important; }
+.flex    { display: flex; }
+.flex-col{ display: flex; flex-direction: column; }
+.items-c { align-items: center; }
+.justify-b{ justify-content: space-between; }
+.flex-1  { flex: 1; }
+.gap-4   { gap: 4px; }  .gap-6   { gap: 6px; }   .gap-8   { gap: 8px; }
+.gap-10  { gap: 10px; } .gap-12  { gap: 12px; }  .gap-16  { gap: 16px; }
+.gap-20  { gap: 20px; } .gap-24  { gap: 24px; }
+
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+.truncate    { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Spacing helpers ── */
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-20 { margin-bottom: 20px; }
+.mb-24 { margin-bottom: 24px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-20 { margin-top: 20px; }
+
+/* ── Keyframe animations ── */
+@keyframes fadeIn   { from { opacity:0; transform:translateY(6px); }  to { opacity:1; transform:none; } }
+@keyframes fadeUp   { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+@keyframes scaleIn  { from { opacity:0; transform:scale(.95); }        to { opacity:1; transform:none; } }
+@keyframes slideR   { from { opacity:0; transform:translateX(18px); }  to { opacity:1; transform:none; } }
+@keyframes popIn    { from { opacity:0; transform:scale(.4); }         to { opacity:1; transform:scale(1); } }
+@keyframes spin     { to   { transform: rotate(360deg); } }
+@keyframes shimmer  { 0%   { background-position:-200% 0; }  100% { background-position:200% 0; } }
+
+.anim-fade  { animation: fadeIn  .28s ease both; }
+.anim-up    { animation: fadeUp  .32s cubic-bezier(.22,.68,0,1.2) both; }
+.anim-scale { animation: scaleIn .24s ease both; }
+.anim-slide { animation: slideR  .28s ease both; }
+.anim-pop   { animation: popIn   .4s cubic-bezier(.34,1.56,.64,1) both; }
+.anim-spin  { animation: spin .65s linear infinite; }
+
+/* Stagger children */
+.stagger > *:nth-child(1) { animation-delay: .04s; }
+.stagger > *:nth-child(2) { animation-delay: .08s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .16s; }
+.stagger > *:nth-child(5) { animation-delay: .20s; }
+.stagger > *:nth-child(6) { animation-delay: .24s; }
+
+/* ── Skeleton loader ── */
+.skel {
+  background: linear-gradient(90deg, var(--parch) 25%, var(--bdr-s) 50%, var(--parch) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r);
+}

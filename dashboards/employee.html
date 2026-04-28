@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AsteraHR - Employee Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/base.css"/>
+  <link rel="stylesheet" href="../assets/css/components.css"/>
+  <link rel="stylesheet" href="../assets/css/layout.css"/>
+  <style>
+    .emp-stack { display:flex; flex-direction:column; gap:16px; }
+    .status-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .status-card {
+      padding:13px 14px; border:1px solid var(--bdr-s); border-radius:var(--r);
+      background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(247,248,252,.88));
+    }
+    .status-card strong { display:block; font-size:13px; color:var(--ink); }
+    .status-card span { display:block; font-size:11.5px; color:var(--ink-mu); margin-top:4px; line-height:1.45; }
+
+    .timeline { display:flex; flex-direction:column; gap:10px; }
+    .timeline-row {
+      display:flex; align-items:flex-start; gap:11px; padding:11px 0;
+      border-bottom:1px solid var(--bdr-s);
+    }
+    .timeline-row:last-child { border-bottom:none; padding-bottom:0; }
+    .timeline-icon {
+      width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+      font-size:15px; flex-shrink:0;
+    }
+    .timeline-copy strong { display:block; font-size:13px; color:var(--ink); }
+    .timeline-copy span { display:block; font-size:11.5px; color:var(--ink-mu); margin-top:3px; line-height:1.45; }
+
+    .metric-list { display:flex; flex-direction:column; gap:13px; }
+    .metric-row .metric-head {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      margin-bottom:5px; font-size:12.5px;
+    }
+    .metric-row .metric-head span { color:var(--ink-m); }
+    .metric-row .metric-head strong { color:var(--ink); }
+
+    .leave-list { display:flex; flex-direction:column; gap:8px; }
+    .leave-row {
+      display:flex; align-items:center; gap:10px; padding:11px 12px;
+      border:1px solid var(--bdr-s); border-radius:var(--r);
+      background:var(--white);
+    }
+    .leave-copy { flex:1; min-width:0; }
+    .leave-copy strong { display:block; font-size:13px; color:var(--ink); }
+    .leave-copy span { display:block; font-size:11.5px; color:var(--ink-mu); margin-top:2px; }
+
+    .day-list { display:flex; flex-direction:column; gap:11px; }
+    .day-row { display:flex; gap:11px; }
+    .day-time {
+      width:58px; flex-shrink:0; font-size:11px; font-weight:700; color:var(--ink-g); padding-top:2px;
+    }
+    .day-card {
+      flex:1; border:1px solid var(--bdr-s); border-radius:var(--r);
+      background:var(--white); padding:11px 12px;
+    }
+    .day-card strong { display:block; font-size:13px; color:var(--ink); }
+    .day-card span { display:block; font-size:11.5px; color:var(--ink-mu); margin-top:3px; }
+
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .action-btn {
+      display:flex; align-items:center; gap:10px; padding:12px 13px;
+      border:1px solid var(--bdr-s); border-radius:var(--r); text-decoration:none;
+      color:var(--ink-m); background:var(--white); transition:all .15s;
+    }
+    .action-btn:hover {
+      transform:translateY(-1px); border-color:#3D4CB5;
+      background:rgba(61,76,181,.05); box-shadow:var(--sh-c);
+    }
+    .action-ico {
+      width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+      background:rgba(61,76,181,.10); color:#3D4CB5; font-size:16px; flex-shrink:0;
+    }
+    .action-copy strong { display:block; font-size:12.5px; color:var(--ink); }
+    .action-copy span { display:block; font-size:11px; color:var(--ink-mu); margin-top:2px; }
+
+    @media (max-width: 768px) {
+      .status-grid, .action-grid { grid-template-columns:1fr; }
+      .day-row { flex-direction:column; gap:6px; }
+      .day-time { width:auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div id="app-shell" style="display:contents"></div>
+
+  <div class="content" id="page-content" style="display:none">
+    <div class="page-container page-view">
+
+      <div class="page-banner mb-20" style="background:linear-gradient(135deg, #35439c 0%, #5a67d8 100%)">
+        <span class="page-banner-icon">&#128100;</span>
+        <div class="page-banner-text">
+          <strong>Your week is well organised</strong>
+          <span>You have 1 approved leave request, 2 training items due this month, and your April attendance is at 96%.</span>
+        </div>
+        <div class="page-banner-actions">
+          <a class="btn btn-white btn-sm" href="../modules/payroll/payslips.html">
+            <span class="btn-text">View Payslip</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="stats-grid stagger">
+        <div class="stat-card blue">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(61,76,181,.10);display:flex;align-items:center;justify-content:center;font-size:20px">&#128338;</div>
+            <span class="stat-trend up">96% this month</span>
+          </div>
+          <div class="stat-val">08:03</div>
+          <div class="stat-lbl">Today’s Check-in</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">Expected shift ends at 5:00 PM · 1 break logged</div>
+        </div>
+        <div class="stat-card gold">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(244,180,0,.12);display:flex;align-items:center;justify-content:center;font-size:20px">&#127796;</div>
+            <span class="stat-trend flat">7 days left</span>
+          </div>
+          <div class="stat-val">14</div>
+          <div class="stat-lbl">Annual Leave Balance</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">2 days approved for April 24-25</div>
+        </div>
+        <div class="stat-card green">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(0,107,66,.10);display:flex;align-items:center;justify-content:center;font-size:20px">&#128176;</div>
+            <span class="stat-trend up">May ready</span>
+          </div>
+          <div class="stat-val">KSh 184K</div>
+          <div class="stat-lbl">Latest Net Pay</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">Payslip available for download now</div>
+        </div>
+        <div class="stat-card red">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(185,28,28,.08);display:flex;align-items:center;justify-content:center;font-size:20px">&#128218;</div>
+            <span class="stat-trend flat">2 pending</span>
+          </div>
+          <div class="stat-val">74%</div>
+          <div class="stat-lbl">Training Progress</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">Cybersecurity and ethics refreshers still open</div>
+        </div>
+      </div>
+
+      <div class="grid-2-1 mb-16">
+        <div class="emp-stack">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>My Updates</h3>
+                <div class="card-sub">Important personal items and reminders</div>
+              </div>
+              <span class="badge badge-blue badge-dot">Live</span>
+            </div>
+            <div class="card-body">
+              <div class="timeline">
+                <div class="timeline-row">
+                  <div class="timeline-icon" style="background:rgba(0,107,66,.10);color:var(--green-l)">&#10003;</div>
+                  <div class="timeline-copy">
+                    <strong>Your annual leave request was approved</strong>
+                    <span>April 24-25 approved by Samuel Kariuki. Handover note due before Wednesday.</span>
+                  </div>
+                </div>
+                <div class="timeline-row">
+                  <div class="timeline-icon" style="background:rgba(61,76,181,.10);color:#3D4CB5)">i</div>
+                  <div class="timeline-copy">
+                    <strong>May payslip is now available</strong>
+                    <span>You can open, download, or print it from the payroll section.</span>
+                  </div>
+                </div>
+                <div class="timeline-row">
+                  <div class="timeline-icon" style="background:rgba(244,180,0,.12);color:var(--gold)">!</div>
+                  <div class="timeline-copy">
+                    <strong>Complete cybersecurity refresher by April 30</strong>
+                    <span>The course takes 35 minutes and counts toward mandatory compliance.</span>
+                  </div>
+                </div>
+                <div class="timeline-row">
+                  <div class="timeline-icon" style="background:rgba(31,60,136,.10);color:var(--navy-l)">i</div>
+                  <div class="timeline-copy">
+                    <strong>Your Q2 performance goals are open</strong>
+                    <span>Add evidence and update progress notes before your next 1:1 meeting.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>My Goals & Progress</h3>
+                <div class="card-sub">Current quarter</div>
+              </div>
+              <a href="../modules/performance/appraisals.html" class="card-action">Open performance</a>
+            </div>
+            <div class="card-body">
+              <div class="metric-list">
+                <div class="metric-row">
+                  <div class="metric-head"><span>Sprint delivery goal</span><strong>82%</strong></div>
+                  <div class="progress"><div class="progress-fill" style="width:82%;background:#3D4CB5"></div></div>
+                </div>
+                <div class="metric-row">
+                  <div class="metric-head"><span>Documentation updates</span><strong>61%</strong></div>
+                  <div class="progress"><div class="progress-fill" style="width:61%;background:var(--gold-b)"></div></div>
+                </div>
+                <div class="metric-row">
+                  <div class="metric-head"><span>Training completion</span><strong>74%</strong></div>
+                  <div class="progress"><div class="progress-fill" style="width:74%;background:var(--green-l)"></div></div>
+                </div>
+                <div class="metric-row">
+                  <div class="metric-head"><span>Manager feedback submitted</span><strong>100%</strong></div>
+                  <div class="progress"><div class="progress-fill" style="width:100%;background:var(--navy-l)"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>Leave Requests</h3>
+                <div class="card-sub">Recent requests and balances</div>
+              </div>
+              <a href="../modules/leave/requests.html" class="card-action">Manage leave</a>
+            </div>
+            <div class="card-body">
+              <div class="leave-list">
+                <div class="leave-row">
+                  <span class="badge badge-green">Approved</span>
+                  <div class="leave-copy">
+                    <strong>Annual leave · April 24-25</strong>
+                    <span>2 days approved · handover reminder pending</span>
+                  </div>
+                </div>
+                <div class="leave-row">
+                  <span class="badge badge-blue">Balance</span>
+                  <div class="leave-copy">
+                    <strong>Annual leave remaining</strong>
+                    <span>14 days available after approved April leave</span>
+                  </div>
+                </div>
+                <div class="leave-row">
+                  <span class="badge badge-gray">Sick</span>
+                  <div class="leave-copy">
+                    <strong>Sick leave balance</strong>
+                    <span>10 days available · no active requests</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="emp-stack">
+          <div class="card">
+            <div class="card-head"><h3>My Snapshot</h3></div>
+            <div class="card-body">
+              <div class="status-grid">
+                <div class="status-card">
+                  <strong>Role</strong>
+                  <span>Senior Engineer in the Engineering department</span>
+                </div>
+                <div class="status-card">
+                  <strong>Manager</strong>
+                  <span>Samuel Kariuki · next 1:1 scheduled this Thursday</span>
+                </div>
+                <div class="status-card">
+                  <strong>Work mode</strong>
+                  <span>Hybrid · remote day approved for Friday</span>
+                </div>
+                <div class="status-card">
+                  <strong>Probation status</strong>
+                  <span>Confirmed employee · no pending HR actions</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>Today’s Plan</h3>
+                <div class="card-sub">Tuesday, April 21</div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="day-list">
+                <div class="day-row">
+                  <div class="day-time">09:00</div>
+                  <div class="day-card">
+                    <strong>Team stand-up</strong>
+                    <span>Share sprint progress and blockers with the engineering team</span>
+                  </div>
+                </div>
+                <div class="day-row">
+                  <div class="day-time">11:30</div>
+                  <div class="day-card">
+                    <strong>Cybersecurity refresher slot</strong>
+                    <span>Reserved 35 minutes to finish the mandatory course</span>
+                  </div>
+                </div>
+                <div class="day-row">
+                  <div class="day-time">14:30</div>
+                  <div class="day-card">
+                    <strong>Code review block</strong>
+                    <span>Review integration PRs before the end-of-day release cut</span>
+                  </div>
+                </div>
+                <div class="day-row">
+                  <div class="day-time">16:00</div>
+                  <div class="day-card">
+                    <strong>Update performance notes</strong>
+                    <span>Add evidence for delivery and mentoring goals before Thursday</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Quick Actions</h3></div>
+            <div class="card-body">
+              <div class="action-grid">
+                <a class="action-btn" href="../modules/leave/requests.html">
+                  <div class="action-ico">&#127796;</div>
+                  <div class="action-copy"><strong>Request Leave</strong><span>Apply and track approvals</span></div>
+                </a>
+                <a class="action-btn" href="../modules/payroll/payslips.html">
+                  <div class="action-ico">&#128179;</div>
+                  <div class="action-copy"><strong>My Payslips</strong><span>Open salary history</span></div>
+                </a>
+                <a class="action-btn" href="../modules/attendance/register.html">
+                  <div class="action-ico">&#128338;</div>
+                  <div class="action-copy"><strong>Attendance</strong><span>Review logs and adjustments</span></div>
+                </a>
+                <a class="action-btn" href="../modules/training/catalogue.html">
+                  <div class="action-ico">&#128218;</div>
+                  <div class="action-copy"><strong>Training</strong><span>Continue required learning</span></div>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-shelf" id="toast-shelf"></div>
+
+<script src="../data/mock-data.js"></script>
+<script src="../assets/js/utils.js"></script>
+<script src="../assets/js/session.js"></script>
+<script src="../assets/js/rbac.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const session = Shell.init({
+      activeNav: 'dashboard',
+      allowedRoles: ['employee'],
+      pageTitle: 'Dashboard',
+      pageSub: 'Keep track of your attendance, leave, pay, and personal goals.',
+    });
+    if (!session) return;
+    document.getElementById('page-content').style.display = 'block';
+  });
+</script>
+</body>
+</html>

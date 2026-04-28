@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AsteraHR — HR Admin Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/base.css"/>
+  <link rel="stylesheet" href="../assets/css/components.css"/>
+  <link rel="stylesheet" href="../assets/css/layout.css"/>
+  <style>
+    /* ── Activity feed ── */
+    .activity-item { display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid var(--bdr-s); }
+    .activity-item:last-child { border-bottom:none;padding-bottom:0; }
+    .act-icon { width:34px;height:34px;border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0; }
+    .act-text  { font-size:13px;color:var(--ink);line-height:1.4; }
+    .act-meta  { font-size:11px;color:var(--ink-g);margin-top:2px; }
+
+    /* ── Approval row ── */
+    .appr-row { display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:var(--r);border:1px solid var(--bdr-s);margin-bottom:7px;transition:all .14s; }
+    .appr-row:hover { border-color:var(--gold-b);background:rgba(244,180,0,.04); }
+    .appr-row:last-child { margin-bottom:0; }
+    .appr-actions { margin-left:auto;display:flex;gap:6px; }
+
+    /* ── Donut ── */
+    .donut-wrap { display:flex;align-items:center;gap:14px; }
+    .donut-legend { flex:1;display:flex;flex-direction:column;gap:7px; }
+    .legend-item { display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-m); }
+    .legend-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .legend-val { margin-left:auto;font-weight:600;color:var(--ink); }
+
+    /* ── Bar chart ── */
+    .bar-chart { display:flex;align-items:flex-end;gap:8px;height:90px;padding-top:8px; }
+    .bar-col { flex:1;display:flex;flex-direction:column;align-items:center;gap:4px; }
+    .bar-fill { width:100%;border-radius:4px 4px 0 0;transition:opacity .2s;cursor:pointer; }
+    .bar-fill:hover { opacity:.75; }
+    .bar-lbl { font-size:10px;color:var(--ink-mu); }
+
+    /* ── Mini calendar ── */
+    .cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px; }
+    .cal-dh { font-size:9.5px;color:var(--ink-g);text-align:center;padding:4px 0;font-weight:600; }
+    .cal-d  { font-size:11.5px;text-align:center;padding:5px 3px;border-radius:5px;cursor:pointer;color:var(--ink-m);transition:all .13s; }
+    .cal-d:hover { background:rgba(31,60,136,.10);color:var(--navy-l); }
+    .cal-d.today { background:var(--navy-l);color:#fff;font-weight:700; }
+    .cal-d.has-ev { position:relative; }
+    .cal-d.has-ev::after { content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:var(--gold-b);border-radius:50%; }
+    .cal-d.dim { color:var(--bdr); }
+
+    /* ── Quick actions ── */
+    .qa-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+    .qa-btn {
+      display:flex;align-items:center;gap:10px;padding:11px 13px;
+      border-radius:var(--r);border:1px solid var(--bdr-s);
+      cursor:pointer;transition:all .15s;background:var(--white);
+      text-decoration:none;color:var(--ink-m);
+    }
+    .qa-btn:hover { border-color:var(--navy-l);background:rgba(31,60,136,.04);transform:translateY(-1px);box-shadow:var(--sh-c); }
+    .qa-icon { font-size:18px; }
+    .qa-lbl { font-size:12.5px;font-weight:500; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Shell (sidebar + header) injected here -->
+  <div id="app-shell" style="display:contents"></div>
+
+  <!-- Content -->
+  <div class="content" id="page-content" style="display:none">
+    <div class="page-container page-view">
+
+      <!-- Banner -->
+      <div class="page-banner mb-20">
+        <span class="page-banner-icon">📋</span>
+        <div class="page-banner-text">
+          <strong>Q2 2025 Performance Review Cycle is Open</strong>
+          <span>847 of 1,284 reviews completed (66%) · Deadline: 30 June 2025</span>
+        </div>
+        <div class="page-banner-actions">
+          <button class="btn btn-white btn-sm" onclick="Toast.info('Opening review cycle manager…')">
+            <span class="btn-text">View Cycle</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Stats -->
+      <div class="stats-grid stagger">
+        <div class="stat-card blue">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(31,60,136,.10);display:flex;align-items:center;justify-content:center;font-size:20px">👥</div>
+            <span class="stat-trend up">↑ 4.2%</span>
+          </div>
+          <div class="stat-val">1,284</div>
+          <div class="stat-lbl">Total Employees</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">+52 this quarter · 3 on probation</div>
+        </div>
+        <div class="stat-card gold">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(244,180,0,.10);display:flex;align-items:center;justify-content:center;font-size:20px">✅</div>
+            <span class="stat-trend up">↑ 1.8%</span>
+          </div>
+          <div class="stat-val">94.7%</div>
+          <div class="stat-lbl">Attendance Rate Today</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">1,217 present · 67 absent · 58 remote</div>
+        </div>
+        <div class="stat-card green">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(0,107,66,.10);display:flex;align-items:center;justify-content:center;font-size:20px">💰</div>
+            <span class="stat-trend up">↑ 1.2%</span>
+          </div>
+          <div class="stat-val">KSh 42M</div>
+          <div class="stat-lbl">Monthly Payroll</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">May 2025 processed · June due in 14 days</div>
+        </div>
+        <div class="stat-card red">
+          <div class="flex items-c justify-b mb-12">
+            <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(185,28,28,.08);display:flex;align-items:center;justify-content:center;font-size:20px">📋</div>
+            <span class="stat-trend flat">→ 7 pending</span>
+          </div>
+          <div class="stat-val">18</div>
+          <div class="stat-lbl">Open Leave Requests</div>
+          <div style="border-top:1px solid var(--bdr-s);margin-top:10px;padding-top:8px;font-size:11px;color:var(--ink-g)">7 require your approval · 11 approved</div>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="grid-2-1 mb-16">
+
+        <!-- Left: activity + payroll trend -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <div class="card">
+            <div class="card-head">
+              <div><h3>Recent HR Activity</h3><div class="card-sub">Last 24 hours</div></div>
+              <span class="card-action">View all</span>
+            </div>
+            <div class="card-body" style="padding-top:8px;padding-bottom:8px">
+              <div class="activity-item">
+                <div class="act-icon" style="background:rgba(31,60,136,.10)">🧑‍💼</div>
+                <div><div class="act-text"><strong>Grace Achieng</strong> promoted to Senior Engineer</div><div class="act-meta">2h ago · Engineering</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="act-icon" style="background:rgba(0,107,66,.10)">✅</div>
+                <div><div class="act-text"><strong>Peter Kamau</strong>'s 5-day leave approved</div><div class="act-meta">4h ago · Finance</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="act-icon" style="background:rgba(244,180,0,.10)">💰</div>
+                <div><div class="act-text">May 2025 payroll processed — KSh 33.4M net disbursed</div><div class="act-meta">Yesterday · Payroll</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="act-icon" style="background:rgba(0,107,66,.10)">🆕</div>
+                <div><div class="act-text"><strong>Mary Njeri</strong> onboarded as Junior Analyst · ICT</div><div class="act-meta">Yesterday · Onboarding</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="act-icon" style="background:rgba(31,60,136,.10)">🔗</div>
+                <div><div class="act-text"><strong>3 candidates</strong> synced from ATS — ready for conversion</div><div class="act-meta">2d ago · ATS Bridge</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <div><h3>Payroll Cost Trend</h3><div class="card-sub">Monthly gross — last 6 months (KSh M)</div></div>
+              <a href="../modules/payroll/run-payroll.html" class="card-action">View Payroll</a>
+            </div>
+            <div class="card-body">
+              <div class="bar-chart">
+                <div class="bar-col"><div class="bar-fill" style="height:65%;background:rgba(31,60,136,.20)"></div><div class="bar-lbl">Jan</div></div>
+                <div class="bar-col"><div class="bar-fill" style="height:68%;background:rgba(31,60,136,.20)"></div><div class="bar-lbl">Feb</div></div>
+                <div class="bar-col"><div class="bar-fill" style="height:72%;background:rgba(31,60,136,.20)"></div><div class="bar-lbl">Mar</div></div>
+                <div class="bar-col"><div class="bar-fill" style="height:74%;background:rgba(31,60,136,.20)"></div><div class="bar-lbl">Apr</div></div>
+                <div class="bar-col"><div class="bar-fill" style="height:78%;background:var(--navy-l)"></div><div class="bar-lbl">May</div></div>
+                <div class="bar-col"><div class="bar-fill" style="height:40%;background:var(--bdr);border:1.5px dashed var(--ink-g)"></div><div class="bar-lbl" style="color:var(--ink-g)">Jun</div></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right column -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <div class="card">
+            <div class="card-head"><h3>Dept. Breakdown</h3></div>
+            <div class="card-body">
+              <div class="donut-wrap">
+                <svg width="90" height="90" viewBox="0 0 90 90" style="flex-shrink:0">
+                  <circle cx="45" cy="45" r="35" fill="none" stroke="var(--bdr)" stroke-width="13"/>
+                  <circle cx="45" cy="45" r="35" fill="none" stroke="var(--navy-l)" stroke-width="13" stroke-dasharray="76 144" stroke-dashoffset="-10"/>
+                  <circle cx="45" cy="45" r="35" fill="none" stroke="var(--gold-b)" stroke-width="13" stroke-dasharray="43 144" stroke-dashoffset="-86"/>
+                  <circle cx="45" cy="45" r="35" fill="none" stroke="var(--green-l)" stroke-width="13" stroke-dasharray="25 144" stroke-dashoffset="-129"/>
+                  <text x="45" y="49" text-anchor="middle" font-size="13" font-weight="700" fill="var(--ink)" font-family="Cormorant Garamond,serif">1.3K</text>
+                </svg>
+                <div class="donut-legend">
+                  <div class="legend-item"><span class="legend-dot" style="background:var(--navy-l)"></span>Engineering<span class="legend-val">427</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:var(--gold-b)"></span>Finance<span class="legend-val">241</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:var(--green-l)"></span>HR &amp; Admin<span class="legend-val">163</span></div>
+                  <div class="legend-item"><span class="legend-dot" style="background:var(--bdr)"></span>Others<span class="legend-val">453</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>Pending Approvals</h3>
+              <span class="badge badge-gold badge-dot">7 items</span>
+            </div>
+            <div style="padding:10px 14px">
+              <div class="appr-row">
+                <div class="av av-sm" style="background:rgba(31,60,136,.10);color:var(--navy-l);font-weight:700">FK</div>
+                <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Fatuma Kidogo</div><div style="font-size:11px;color:var(--ink-mu)">Leave · 3 days</div></div>
+                <div class="appr-actions">
+                  <button class="btn btn-green btn-sm" onclick="approveItem(this, 'Leave approved')">✓</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectItem(this)">✗</button>
+                </div>
+              </div>
+              <div class="appr-row">
+                <div class="av av-sm" style="background:rgba(244,180,0,.12);color:var(--gold);font-weight:700">OO</div>
+                <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Oliver Odhiambo</div><div style="font-size:11px;color:var(--ink-mu)">Overtime · 14 hrs</div></div>
+                <div class="appr-actions">
+                  <button class="btn btn-green btn-sm" onclick="approveItem(this, 'OT approved')">✓</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectItem(this)">✗</button>
+                </div>
+              </div>
+              <div class="appr-row">
+                <div class="av av-sm" style="background:rgba(0,107,66,.10);color:var(--green-l);font-weight:700">MN</div>
+                <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Mary Njeri</div><div style="font-size:11px;color:var(--ink-mu)">Study Leave · 5 days</div></div>
+                <div class="appr-actions">
+                  <button class="btn btn-green btn-sm" onclick="approveItem(this, 'Study leave approved')">✓</button>
+                  <button class="btn btn-danger btn-sm" onclick="rejectItem(this)">✗</button>
+                </div>
+              </div>
+              <div style="padding:8px 0 2px;text-align:center">
+                <a href="../modules/leave/requests.html" style="font-size:12.5px;color:var(--navy-l);font-weight:500">View all 7 approvals →</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>HR Calendar</h3><span class="card-action">Full view</span></div>
+            <div class="card-body">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <button style="background:none;border:none;color:var(--ink-mu);cursor:pointer;font-size:14px;padding:4px">‹</button>
+                <span style="font-size:13px;font-weight:600;color:var(--ink)">June 2025</span>
+                <button style="background:none;border:none;color:var(--ink-mu);cursor:pointer;font-size:14px;padding:4px">›</button>
+              </div>
+              <div class="cal-grid">
+                <div class="cal-dh">Su</div><div class="cal-dh">Mo</div><div class="cal-dh">Tu</div><div class="cal-dh">We</div><div class="cal-dh">Th</div><div class="cal-dh">Fr</div><div class="cal-dh">Sa</div>
+                <div class="cal-d dim">25</div><div class="cal-d dim">26</div><div class="cal-d dim">27</div><div class="cal-d dim">28</div><div class="cal-d dim">29</div><div class="cal-d dim">30</div><div class="cal-d dim">31</div>
+                <div class="cal-d">1</div><div class="cal-d">2</div><div class="cal-d has-ev">3</div><div class="cal-d">4</div><div class="cal-d">5</div><div class="cal-d">6</div><div class="cal-d">7</div>
+                <div class="cal-d">8</div><div class="cal-d has-ev">9</div><div class="cal-d">10</div><div class="cal-d">11</div><div class="cal-d">12</div><div class="cal-d">13</div><div class="cal-d">14</div>
+                <div class="cal-d">15</div><div class="cal-d has-ev">16</div><div class="cal-d today">17</div><div class="cal-d">18</div><div class="cal-d has-ev">19</div><div class="cal-d">20</div><div class="cal-d">21</div>
+                <div class="cal-d">22</div><div class="cal-d">23</div><div class="cal-d">24</div><div class="cal-d has-ev">25</div><div class="cal-d">26</div><div class="cal-d">27</div><div class="cal-d">28</div>
+                <div class="cal-d">29</div><div class="cal-d">30</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Quick actions + Metrics -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Quick Actions</h3></div>
+          <div class="card-body">
+            <div class="qa-grid">
+              <a class="qa-btn" href="../modules/employees/list.html">
+                <span class="qa-icon">➕</span><span class="qa-lbl">Add Employee</span>
+              </a>
+              <a class="qa-btn" href="../modules/payroll/run-payroll.html">
+                <span class="qa-icon">💳</span><span class="qa-lbl">Run Payroll</span>
+              </a>
+              <a class="qa-btn" href="../modules/leave/requests.html">
+                <span class="qa-icon">🌴</span><span class="qa-lbl">Approve Leave</span>
+              </a>
+              <a class="qa-btn" href="../modules/reports/analytics.html">
+                <span class="qa-icon">📊</span><span class="qa-lbl">Generate Report</span>
+              </a>
+              <a class="qa-btn" href="../modules/ats-middleware/sync-dashboard.html">
+                <span class="qa-icon">🔗</span><span class="qa-lbl">ATS Bridge</span>
+              </a>
+              <a class="qa-btn" href="../modules/training/catalogue.html">
+                <span class="qa-icon">📚</span><span class="qa-lbl">Schedule Training</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Workforce Health</h3><div class="card-sub">Current quarter</div></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:13px">
+            <div>
+              <div class="flex items-c justify-b mb-4" style="font-size:13px"><span style="color:var(--ink-m)">Retention Rate</span><strong style="color:var(--green-l)">91.4%</strong></div>
+              <div class="progress"><div class="progress-fill" style="width:91%;background:var(--green-l)"></div></div>
+            </div>
+            <div>
+              <div class="flex items-c justify-b mb-4" style="font-size:13px"><span style="color:var(--ink-m)">Training Completion</span><strong style="color:var(--navy-l)">78.2%</strong></div>
+              <div class="progress"><div class="progress-fill" style="width:78%;background:var(--navy-l)"></div></div>
+            </div>
+            <div>
+              <div class="flex items-c justify-b mb-4" style="font-size:13px"><span style="color:var(--ink-m)">Performance Reviews Done</span><strong style="color:var(--gold)">66%</strong></div>
+              <div class="progress"><div class="progress-fill" style="width:66%;background:var(--gold-b)"></div></div>
+            </div>
+            <div>
+              <div class="flex items-c justify-b mb-4" style="font-size:13px"><span style="color:var(--ink-m)">Gender Parity (Female)</span><strong style="color:#7C3AED">44%</strong></div>
+              <div class="progress"><div class="progress-fill" style="width:44%;background:#7C3AED"></div></div>
+            </div>
+            <div>
+              <div class="flex items-c justify-b mb-4" style="font-size:13px"><span style="color:var(--ink-m)">Statutory Compliance</span><strong style="color:var(--green-l)">100%</strong></div>
+              <div class="progress"><div class="progress-fill" style="width:100%;background:var(--green-l)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /#page-content -->
+</div><!-- /.app -->
+
+<div class="toast-shelf" id="toast-shelf"></div>
+
+<script src="../data/mock-data.js"></script>
+<script src="../assets/js/utils.js"></script>
+<script src="../assets/js/session.js"></script>
+<script src="../assets/js/rbac.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const session = Shell.init({
+      activeNav:    'dashboard',
+      allowedRoles: ['hr_admin'],
+      pageTitle:    'Dashboard',
+      pageSub:      "Welcome back. Here's your HR overview for today.",
+    });
+    if (!session) return;
+    document.getElementById('page-content').style.display = 'block';
+  });
+
+  function approveItem(btn, msg) {
+    const row = btn.closest('.appr-row');
+    row.style.opacity = '.4'; row.style.pointerEvents = 'none';
+    Toast.success(msg);
+    Session.audit('LEAVE_APPROVED', msg);
+  }
+  function rejectItem(btn) {
+    const row = btn.closest('.appr-row');
+    row.style.opacity = '.4'; row.style.pointerEvents = 'none';
+    Toast.error('Request rejected');
+    Session.audit('LEAVE_REJECTED', 'Leave request rejected');
+  }
+</script>
+</body>
+</html>

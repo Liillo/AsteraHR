@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AsteraHR — Sign In</title>
+  <link rel="stylesheet" href="assets/css/tokens.css"/>
+  <link rel="stylesheet" href="assets/css/base.css"/>
+  <link rel="stylesheet" href="assets/css/components.css"/>
+  <link rel="stylesheet" href="assets/css/login.css"/>
+</head>
+<body>
+
+<div class="login-shell">
+
+  <!-- ══════════════ LEFT PANEL ══════════════ -->
+  <div class="lp">
+    <div class="lp-glow"></div>
+    <div class="lp-shape-a"></div>
+    <div class="lp-shape-b"></div>
+    <div class="lp-watermark">A</div>
+
+    <div class="lp-brand">
+      <div class="lp-seal">A</div>
+      <div class="lp-brand-text">
+        <strong>AsteraHR</strong>
+        <span>Human Resource ERP System</span>
+      </div>
+    </div>
+
+    <div class="lp-hero">
+      <div class="lp-eyebrow"><span>Institutional HR Platform</span></div>
+      <h1 class="lp-headline">
+        Managing<br>People with<br><em>Precision.</em>
+      </h1>
+      <p class="lp-sub">
+        A unified system for workforce records, payroll, performance and compliance — engineered for AsteraHR's governance standards and operational scale.
+      </p>
+      <div class="lp-rule"></div>
+      <div class="lp-features">
+        <div class="lp-feat">
+          <div class="lp-feat-num">01</div>
+          <div class="lp-feat-text">
+            <strong>Role-Based Access Control</strong>
+            <span>Five access tiers — each user sees exactly what their role permits.</span>
+          </div>
+        </div>
+        <div class="lp-feat">
+          <div class="lp-feat-num">02</div>
+          <div class="lp-feat-text">
+            <strong>ATS Middleware Bridge</strong>
+            <span>Linked to your recruitment system with configurable field mapping.</span>
+          </div>
+        </div>
+        <div class="lp-feat">
+          <div class="lp-feat-num">03</div>
+          <div class="lp-feat-text">
+            <strong>Multi-Factor Authentication</strong>
+            <span>OTP verification for privileged accounts with full audit trail.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-footer">© 2026 AsteraHR &nbsp;·&nbsp; ERP Platform v2.0</div>
+  </div>
+
+  <!-- ══════════════ RIGHT PANEL ══════════════ -->
+  <div class="rp">
+    <div class="rp-wrap">
+
+      <!-- STEP: SIGN IN -->
+      <div class="step active" id="s-signin">
+        <div class="auth-card">
+          <div class="auth-card-head">
+            <h2>Sign In</h2>
+            <p>Access your AsteraHR account to continue.</p>
+          </div>
+
+          <div class="demo-strip">
+            <div class="demo-strip-label">Demo accounts — click to fill</div>
+            <div class="demo-pills" id="demo-pills"></div>
+          </div>
+
+          <div class="fg" id="fg-email">
+            <div class="fl"><label for="inp-email">Email Address</label></div>
+            <div class="input-wrap">
+              <span class="i-ico">✉</span>
+              <input type="email" id="inp-email"
+                placeholder="yourname@asterahr.co.ke" autocomplete="email"/>
+            </div>
+            <div class="fg err-txt" id="email-err">Please enter a valid email address.</div>
+          </div>
+
+          <div class="fg" id="fg-pwd">
+            <div class="fl">
+              <label for="inp-pwd">Password</label>
+              <span class="fl-link" onclick="LoginCtrl.goStep('s-forgot')">Forgot password?</span>
+            </div>
+            <div class="input-wrap has-right">
+              <span class="i-ico">🔒</span>
+              <input type="password" id="inp-pwd"
+                placeholder="Enter your password" autocomplete="current-password"
+                onkeydown="if(event.key==='Enter') LoginCtrl.doLogin()"/>
+              <button class="eye-btn" onclick="toggleEye('inp-pwd', this)" tabindex="-1">👁</button>
+            </div>
+            <div class="fg err-txt" id="pwd-err">Password is required.</div>
+          </div>
+
+          <label class="chk-row">
+            <input type="checkbox" id="chk-remember"/>
+            <span>Keep me signed in for 8 hours</span>
+          </label>
+
+          <div class="alert alert-danger" id="login-alert" style="display:none">
+            <span class="alert-icon">⚠</span>
+            <span class="alert-body" id="login-alert-msg"></span>
+          </div>
+
+          <button class="btn btn-navy btn-block btn-lg" id="btn-signin"
+            onclick="LoginCtrl.doLogin()">
+            <div class="btn-spin anim-spin"></div>
+            <span class="btn-text">Sign In to AsteraHR</span>
+          </button>
+        </div>
+        <div class="auth-foot">
+          Need help? <a href="mailto:it@asterahr.co.ke">Contact IT Support</a>
+        </div>
+      </div>
+
+      <!-- STEP: MFA -->
+      <div class="step" id="s-mfa">
+        <div class="auth-card">
+          <span class="auth-back" onclick="LoginCtrl.goStep('s-signin')">Back to sign in</span>
+          <div style="text-align:center;margin-bottom:26px">
+            <div class="success-ring" style="background:rgba(31,60,136,.07);border:1.5px solid rgba(31,60,136,.2)">🔐</div>
+            <h2 style="font-family:var(--f-serif);font-size:27px;font-weight:600;color:var(--ink);margin-bottom:8px">Verify Your Identity</h2>
+            <p style="font-size:13.5px;font-weight:300;color:var(--ink-s);line-height:1.6">
+              A 6-digit code was sent to<br>
+              <strong id="mfa-hint" style="color:var(--navy-l);font-weight:600"></strong>
+            </p>
+          </div>
+          <div class="alert alert-info" style="margin-bottom:19px">
+            <span class="alert-icon">ℹ</span>
+            <span class="alert-body"><strong>Demo:</strong> Open browser console (F12) to see the OTP.</span>
+          </div>
+          <div class="otp-row" id="otp-row"></div>
+          <div class="alert alert-danger" id="mfa-alert" style="display:none;margin-top:13px">
+            <span class="alert-icon">⚠</span>
+            <span class="alert-body" id="mfa-alert-msg"></span>
+          </div>
+          <button class="btn btn-navy btn-block" id="btn-mfa" style="margin-top:20px"
+            onclick="LoginCtrl.doMFA()">
+            <div class="btn-spin anim-spin"></div>
+            <span class="btn-text">Verify Code</span>
+          </button>
+          <div class="resend-row">
+            Didn't receive it?&nbsp;
+            <span class="resend-link" id="resend-link" onclick="LoginCtrl.resendOTP()">Resend code</span>
+            <span class="resend-timer" id="resend-timer" style="display:none"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP: FORGOT PASSWORD -->
+      <div class="step" id="s-forgot">
+        <div class="auth-card">
+          <span class="auth-back" onclick="LoginCtrl.goStep('s-signin')">Back to sign in</span>
+          <div class="auth-card-head">
+            <h2>Reset Password</h2>
+            <p>Enter your work email and we'll send a secure reset link.</p>
+          </div>
+          <div class="fg" id="fg-reset">
+            <div class="fl"><label for="inp-reset">Work Email</label></div>
+            <div class="input-wrap">
+              <span class="i-ico">✉</span>
+              <input type="email" id="inp-reset" placeholder="yourname@asterahr.co.ke"
+                onkeydown="if(event.key==='Enter') LoginCtrl.doForgot()"/>
+            </div>
+            <div class="fg err-txt" id="reset-err">Please enter a valid email address.</div>
+          </div>
+          <div class="alert alert-danger" id="forgot-alert" style="display:none;margin-bottom:17px">
+            <span class="alert-icon">⚠</span>
+            <span class="alert-body" id="forgot-alert-msg"></span>
+          </div>
+          <button class="btn btn-navy btn-block" id="btn-forgot" onclick="LoginCtrl.doForgot()">
+            <div class="btn-spin anim-spin"></div>
+            <span class="btn-text">Send Reset Link</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP: RESET SENT -->
+      <div class="step" id="s-reset-sent">
+        <div class="auth-card" style="text-align:center;padding-top:46px;padding-bottom:46px">
+          <div class="success-ring" style="background:rgba(0,107,66,.07);border:1.5px solid rgba(0,107,66,.22)">✉</div>
+          <h2 style="font-family:var(--f-serif);font-size:27px;font-weight:600;color:var(--ink);margin-bottom:9px">Check Your Inbox</h2>
+          <p style="font-size:13.5px;font-weight:300;color:var(--ink-s);line-height:1.7;margin-bottom:26px;max-width:290px;margin-left:auto;margin-right:auto">
+            If that address exists in our system, a reset link has been sent. Check your spam folder too.
+          </p>
+          <button class="btn btn-ghost" onclick="LoginCtrl.goStep('s-signin')"
+            style="max-width:200px;margin:0 auto">
+            <span class="btn-text">Back to Sign In</span>
+          </button>
+          <p style="font-size:12px;color:var(--ink-g);margin-top:16px">
+            Still stuck? Email <a href="mailto:hr@asterahr.co.ke" style="color:var(--navy-l)">hr@asterahr.co.ke</a>
+          </p>
+        </div>
+      </div>
+
+      <!-- STEP: FORCE CHANGE PASSWORD -->
+      <div class="step" id="s-changepwd">
+        <div class="auth-card">
+          <div class="auth-card-head">
+            <h2>Set New Password</h2>
+            <p>Your account requires a password update before you can continue.</p>
+          </div>
+          <div class="fg">
+            <div class="fl"><label for="inp-newpwd">New Password</label></div>
+            <div class="input-wrap has-right">
+              <span class="i-ico">🔒</span>
+              <input type="password" id="inp-newpwd" placeholder="Minimum 8 characters"
+                oninput="LoginCtrl.updateStrength(this.value)"/>
+              <button class="eye-btn" onclick="toggleEye('inp-newpwd', this)" tabindex="-1">👁</button>
+            </div>
+            <div class="strength-track"><div class="strength-bar" id="str-bar"></div></div>
+            <div class="strength-label" id="str-label">Enter a password</div>
+          </div>
+          <div class="fg" id="fg-confirm">
+            <div class="fl"><label for="inp-confirm">Confirm Password</label></div>
+            <div class="input-wrap has-right">
+              <span class="i-ico">🔒</span>
+              <input type="password" id="inp-confirm" placeholder="Repeat new password"/>
+              <button class="eye-btn" onclick="toggleEye('inp-confirm', this)" tabindex="-1">👁</button>
+            </div>
+            <div class="fg err-txt" id="confirm-err">Passwords do not match.</div>
+          </div>
+          <div class="rules-box">
+            <h4>Password must include</h4>
+            <div class="pwd-rule" id="r-len"><div class="pwd-rule-dot"></div>At least 8 characters</div>
+            <div class="pwd-rule" id="r-up"> <div class="pwd-rule-dot"></div>One uppercase letter (A–Z)</div>
+            <div class="pwd-rule" id="r-lo"> <div class="pwd-rule-dot"></div>One lowercase letter (a–z)</div>
+            <div class="pwd-rule" id="r-num"><div class="pwd-rule-dot"></div>One number (0–9)</div>
+            <div class="pwd-rule" id="r-sp"> <div class="pwd-rule-dot"></div>One special character (!@#$%^&amp;*)</div>
+          </div>
+          <div class="alert alert-danger" id="cp-alert" style="display:none;margin-bottom:17px">
+            <span class="alert-icon">⚠</span>
+            <span class="alert-body" id="cp-alert-msg"></span>
+          </div>
+          <button class="btn btn-navy btn-block" id="btn-cp" onclick="LoginCtrl.doChangePwd()">
+            <div class="btn-spin anim-spin"></div>
+            <span class="btn-text">Set Password &amp; Continue</span>
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /.rp-wrap -->
+  </div><!-- /.rp -->
+</div><!-- /.login-shell -->
+
+<!-- Toast shelf -->
+<div class="toast-shelf" id="toast-shelf"></div>
+
+<!-- Scripts -->
+<script src="data/mock-data.js"></script>
+<script src="assets/js/utils.js"></script>
+<script src="assets/js/session.js"></script>
+<script src="assets/js/rbac.js"></script>
+<script src="assets/js/login-ctrl.js"></script>
+</body>
+</html>
