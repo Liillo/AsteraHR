@@ -32,6 +32,7 @@ const RBAC = (() => {
       items: [
         { key: 'attendance', icon: '🕐', label: 'Attendance', perm: ['attendance', 'view'] },
         { key: 'leave', icon: '🌴', label: 'Leave', perm: ['leave', 'view'], badge: 'leave' },
+        { key: 'calendar', icon: '🗓', label: 'Calendar', roles: ['hr_admin', 'hr_officer', 'manager', 'employee'] },
         { key: 'shifts', icon: '🔄', label: 'Shifts', perm: ['attendance', 'view'], roles: ['hr_admin', 'hr_officer', 'manager'] },
       ],
     },
@@ -75,6 +76,7 @@ const RBAC = (() => {
     ats: 'modules/ats-middleware/sync-dashboard.html',
     attendance: 'modules/attendance/register.html',
     leave: 'modules/leave/requests.html',
+    calendar: 'modules/calendar/view.html',
     shifts: 'modules/attendance/shifts.html',
     payroll: 'modules/payroll/run-payroll.html',
     payslips: 'modules/payroll/payslips.html',
@@ -226,7 +228,7 @@ const RBAC = (() => {
   }
 
   function populateHeader(session, pageTitle = '', pageSub = '') {
-    const m = meta(session.role);
+    const roleMeta = meta(session.role);
 
     if (pageTitle) {
       const h1 = document.getElementById('page-title');
@@ -239,13 +241,13 @@ const RBAC = (() => {
 
     const pill = document.getElementById('role-pill');
     if (pill) {
-      pill.textContent = `${m.icon}  ${m.label}`;
+      pill.textContent = `${roleMeta.icon}  ${roleMeta.label}`;
       pill.style.cssText = `
         display:inline-flex;align-items:center;gap:5px;
         padding:4px 11px;border-radius:999px;
         font-size:11.5px;font-weight:600;letter-spacing:.2px;
-        background:${m.bg};color:${m.col};
-        border:1px solid ${m.col}30;
+        background:${roleMeta.bg};color:${roleMeta.col};
+        border:1px solid ${roleMeta.col}30;
       `;
     }
   }

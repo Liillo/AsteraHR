@@ -213,49 +213,30 @@ const Shell = (() => {
   }
 
   function _renderNotifs(session) {
-    // Demo notifications per role
-    const notifs = {
-      hr_admin:   [
-        { type:'leave',   msg:'Fatuma Kidogo submitted a leave request',  time:'2h ago', read:false },
-        { type:'payroll', msg:'June payroll is due for processing',        time:'5h ago', read:false },
-        { type:'ats',     msg:'3 new hires synced from ATS',               time:'1d ago', read:true  },
-      ],
-      hr_officer: [
-        { type:'leave',    msg:"Oliver Odhiambo's leave needs approval",   time:'3h ago', read:false },
-        { type:'document', msg:'2 contracts expiring this month',           time:'1d ago', read:false },
-      ],
-      manager: [
-        { type:'leave',       msg:'Grace Achieng requested 2 days off',    time:'1h ago', read:false },
-        { type:'performance', msg:"Your team's Q2 reviews are 40% done",   time:'3d ago', read:true  },
-      ],
-      employee: [
-        { type:'payroll',  msg:'Your May payslip is ready',                 time:'5d ago', read:false },
-        { type:'training', msg:'Leadership Training starts June 24',         time:'2d ago', read:true  },
-      ],
-      it_admin: [
-        { type:'system', msg:'ATS webhook config needs attention',           time:'1h ago', read:false },
-        { type:'system', msg:'Failed login attempt from unknown IP',         time:'3h ago', read:false },
-      ],
-    };
-
-    const list = notifs[session.role] || [];
-    const unread = list.filter(n => !n.read).length;
+    const list = Notify.get(session.userId);
+    const unread = Notify.unreadCount(session.userId);
     const dot = document.getElementById('notif-dot');
     if (dot) dot.style.display = unread > 0 ? 'block' : 'none';
 
-    const typeIcon = { leave:'🌴', payroll:'💰', ats:'🔗', document:'📄', performance:'⭐', training:'📚', system:'⚙', default:'🔔' };
-    const typeBg   = { leave:'rgba(0,107,66,.10)', payroll:'rgba(200,150,12,.10)', ats:'rgba(31,60,136,.10)', system:'rgba(185,28,28,.08)', default:'var(--parch)' };
+    const typeIcon = { leave:'🌴', payroll:'💰', ats:'🔗', document:'📄', performance:'⭐', training:'📚', attendance:'🕐', announcement:'📢', system:'⚙', default:'🔔' };
+    const typeBg   = { leave:'rgba(0,107,66,.10)', payroll:'rgba(200,150,12,.10)', ats:'rgba(31,60,136,.10)', document:'rgba(61,76,181,.10)', performance:'rgba(139,92,0,.10)', training:'rgba(0,107,66,.08)', attendance:'rgba(31,60,136,.10)', announcement:'rgba(185,28,28,.08)', system:'rgba(185,28,28,.08)', default:'var(--parch)' };
 
     const listEl = document.getElementById('notif-list');
     if (!listEl) return;
     listEl.innerHTML = list.length ? list.map(n => `
-      <div class="notif-item ${n.read ? '' : 'unread'}">
+      <div class="notif-item ${n.read ? '' : 'unread'}" style="align-items:flex-start">
         <div class="notif-icon" style="background:${typeBg[n.type]||typeBg.default}">
           ${typeIcon[n.type]||typeIcon.default}
         </div>
         <div style="flex:1">
-          <div class="notif-msg">${n.msg}</div>
-          <div class="notif-time">${n.time}</div>
+          <div class="notif-msg" style="font-weight:600">${n.title || 'Notification'}</div>
+          <div class="notif-msg" style="margin-top:2px">${n.msg}</div>
+          <div class="notif-time">${Fmt.timeAgo(n.createdAt)}</div>
+          ${n.href ? `<a href="${RBAC.appPath(n.href)}" onclick="Shell.openNotif('${n.id}')" style="display:inline-block;margin-top:6px;font-size:12px;color:var(--navy-l);font-weight:600;text-decoration:none">Open</a>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-left:8px">
+          ${!n.read ? `<button onclick="Shell.readNotif('${n.id}')" title="Mark read" style="background:none;border:none;color:var(--ink-g);cursor:pointer;font-size:13px;padding:0">✓</button>` : ''}
+          <button onclick="Shell.dismissNotif('${n.id}')" title="Dismiss" style="background:none;border:none;color:var(--ink-g);cursor:pointer;font-size:14px;padding:0">×</button>
         </div>
         ${!n.read ? '<div class="notif-unread-dot"></div>' : ''}
       </div>
@@ -288,11 +269,31 @@ const Shell = (() => {
   }
 
   function markAllRead() {
-    document.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
-    document.querySelectorAll('.notif-unread-dot').forEach(el => el.remove());
-    const dot = document.getElementById('notif-dot');
-    if (dot) dot.style.display = 'none';
+    const session = Session.get();
+    if (!session) return;
+    Notify.markAllRead(session.userId);
+    _renderNotifs(session);
     Toast.success('All notifications marked as read');
+  }
+
+  function readNotif(id) {
+    const session = Session.get();
+    if (!session) return;
+    Notify.markRead(id, session.userId);
+    _renderNotifs(session);
+  }
+
+  function dismissNotif(id) {
+    const session = Session.get();
+    if (!session) return;
+    Notify.dismiss(id, session.userId);
+    _renderNotifs(session);
+  }
+
+  function openNotif(id) {
+    const session = Session.get();
+    if (!session) return;
+    Notify.markRead(id, session.userId);
   }
 
   async function submitChangePwd() {
@@ -325,7 +326,7 @@ const Shell = (() => {
     }
   }
 
-  return { init, confirmLogout, markAllRead, submitChangePwd, globalSearch };
+  return { init, confirmLogout, markAllRead, readNotif, dismissNotif, openNotif, submitChangePwd, globalSearch };
 
 })();
 

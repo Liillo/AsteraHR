@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AsteraHR - Calendar</title>
+  <link rel="stylesheet" href="../../assets/css/tokens.css"/>
+  <link rel="stylesheet" href="../../assets/css/base.css"/>
+  <link rel="stylesheet" href="../../assets/css/components.css"/>
+  <link rel="stylesheet" href="../../assets/css/layout.css"/>
+  <style>
+    .calendar-shell { display:flex; flex-direction:column; gap:18px; }
+    .calendar-hero {
+      display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap;
+      padding:22px 24px; border:1px solid var(--bdr-s); border-radius:var(--r-lg);
+      background:linear-gradient(135deg, rgba(31,60,136,.96), rgba(61,76,181,.92));
+      color:#fff;
+    }
+    .calendar-eyebrow { font-size:11px; text-transform:uppercase; letter-spacing:.08em; opacity:.75; margin-bottom:8px; }
+    .calendar-hero h2 { font-size:28px; margin-bottom:8px; color:#fff; }
+    .calendar-hero p { max-width:640px; color:rgba(255,255,255,.82); line-height:1.6; }
+    .calendar-legend { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+    .calendar-legend span { color:rgba(255,255,255,.9) !important; }
+    .calendar-workspace { display:grid; grid-template-columns:minmax(0, 1.8fr) minmax(280px, .9fr); gap:18px; }
+    .calendar-board, .calendar-side {
+      border:1px solid var(--bdr-s); border-radius:var(--r-lg); background:var(--white);
+      box-shadow:var(--sh-c);
+    }
+    .calendar-board { padding:18px; }
+    .calendar-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+    .calendar-month-label { font-size:20px; color:var(--ink); }
+    .calendar-weekdays {
+      display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; margin-bottom:8px;
+      color:var(--ink-g); font-size:11px; font-weight:700; text-transform:uppercase;
+    }
+    .calendar-grid { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:8px; }
+    .calendar-cell {
+      min-height:108px; border:1px solid var(--bdr-s); border-radius:12px; background:#fff;
+      padding:10px; text-align:left; display:flex; flex-direction:column; gap:8px; cursor:pointer;
+      transition:transform .14s, border-color .14s, box-shadow .14s, background .14s;
+    }
+    .calendar-cell:hover { transform:translateY(-1px); border-color:var(--navy-l); box-shadow:var(--sh-c); }
+    .calendar-cell.is-dim { background:rgba(247,248,252,.75); color:var(--ink-g); }
+    .calendar-cell.is-today { border-color:var(--navy-l); background:rgba(31,60,136,.04); }
+    .calendar-cell.is-selected { box-shadow:0 0 0 2px rgba(31,60,136,.18) inset; }
+    .calendar-cell.is-ranged { box-shadow:0 0 0 1px rgba(0,107,66,.12) inset; }
+    .calendar-cell-num { font-size:13px; font-weight:700; color:var(--ink); }
+    .calendar-cell-events { display:flex; flex-direction:column; gap:5px; min-height:44px; }
+    .calendar-cell-empty { display:block; min-height:12px; }
+    .calendar-pill {
+      display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      padding:4px 7px; border-radius:8px; background:var(--pill-bg, rgba(31,60,136,.12));
+      color:var(--pill-fg, var(--navy-l)); font-size:10.5px; font-weight:700;
+    }
+    .calendar-pill.is-span { border-radius:6px; }
+    .calendar-cell-more { margin-top:auto; font-size:11px; color:var(--ink-g); }
+    .calendar-side { padding:18px; }
+    .calendar-side-head { padding-bottom:14px; border-bottom:1px solid var(--bdr-s); }
+    .calendar-side-head strong { display:block; font-size:18px; color:var(--ink); }
+    .calendar-side-head span { display:block; margin-top:5px; font-size:12px; color:var(--ink-g); }
+    #calendar-day-events > div:last-child { border-bottom:none !important; padding-bottom:0; }
+    @media (max-width: 1100px) {
+      .calendar-workspace { grid-template-columns:1fr; }
+    }
+    @media (max-width: 720px) {
+      .calendar-board { padding:14px; }
+      .calendar-grid { gap:6px; }
+      .calendar-cell { min-height:92px; padding:8px; }
+      .calendar-cell-events { min-height:36px; }
+      .calendar-pill { font-size:10px; padding:3px 6px; }
+      .calendar-hero h2 { font-size:24px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div id="app-shell" style="display:contents"></div>
+  <div class="content" id="page-content" style="display:none">
+    <div class="page-container page-view">
+      <div id="calendar-root"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-shelf" id="toast-shelf"></div>
+
+<script src="../../data/mock-data.js"></script>
+<script src="../../assets/js/utils.js"></script>
+<script src="../../assets/js/session.js"></script>
+<script src="../../assets/js/rbac.js"></script>
+<script src="../../assets/js/shell.js"></script>
+<script src="../../assets/js/calendar.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const session = Shell.init({
+      activeNav: 'calendar',
+      allowedRoles: ['hr_admin', 'hr_officer', 'manager', 'employee'],
+      pageTitle: 'Calendar',
+      pageSub: 'Track approved leave, training, payroll runs, review deadlines, and public holidays.',
+    });
+    if (!session) return;
+    const root = document.getElementById('calendar-root');
+    if (root) AsteraCalendar.renderPage(root, session, AsteraCalendar.initialDateFromLocation());
+    document.getElementById('page-content').style.display = 'block';
+  });
+</script>
+</body>
+</html>

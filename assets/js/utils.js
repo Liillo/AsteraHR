@@ -51,6 +51,100 @@ const Toast = (() => {
   };
 })();
 
+/* ====================================
+   NOTIFICATIONS
+==================================== */
+const Notify = (() => {
+  const KEY = 'asterahr_notifications';
+
+  function _read() {
+    try {
+      const list = JSON.parse(localStorage.getItem(KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function _write(list) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(list));
+    } catch {
+      /* ignore storage failures in demo mode */
+    }
+  }
+
+  function _id() {
+    return `NTF-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function push(payload = {}) {
+    const userIds = [...new Set((payload.userIds || []).filter(Boolean))];
+    if (!userIds.length) return [];
+
+    const now = new Date().toISOString();
+    const list = _read();
+    const created = userIds.map(userId => ({
+      id: _id(),
+      userId,
+      type: payload.type || 'default',
+      title: payload.title || 'Notification',
+      msg: payload.msg || '',
+      href: payload.href || '',
+      read: false,
+      dismissed: false,
+      createdAt: now,
+      actor: payload.actor || null,
+    }));
+
+    _write([...created, ...list]);
+    return created;
+  }
+
+  function get(userId) {
+    return _read()
+      .filter(item => item.userId === userId && !item.dismissed)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  function unreadCount(userId) {
+    return get(userId).filter(item => !item.read).length;
+  }
+
+  function markRead(id, userId) {
+    const list = _read();
+    const match = list.find(item => item.id === id && item.userId === userId);
+    if (!match) return false;
+    match.read = true;
+    _write(list);
+    return true;
+  }
+
+  function dismiss(id, userId) {
+    const list = _read();
+    const match = list.find(item => item.id === id && item.userId === userId);
+    if (!match) return false;
+    match.dismissed = true;
+    _write(list);
+    return true;
+  }
+
+  function markAllRead(userId) {
+    const list = _read();
+    let changed = false;
+    list.forEach(item => {
+      if (item.userId === userId && !item.dismissed && !item.read) {
+        item.read = true;
+        changed = true;
+      }
+    });
+    if (changed) _write(list);
+    return changed;
+  }
+
+  return { push, get, unreadCount, markRead, dismiss, markAllRead };
+})();
+
 /* ════════════════════════════════════
    MODAL HELPERS
 ════════════════════════════════════ */
@@ -257,6 +351,7 @@ async function copyText(text) {
    EXPOSE GLOBALS
 ════════════════════════════════════ */
 window.Toast       = Toast;
+window.Notify      = Notify;
 window.Fmt         = Fmt;
 window.Validate    = Validate;
 window.DateUtil    = DateUtil;

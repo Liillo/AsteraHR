@@ -1023,6 +1023,15 @@ const ModulePage = (() => {
             dept: data.audience === 'All employees' ? undefined : defaults.department,
           });
           Session.audit('ANNOUNCEMENT_CREATE', `${data.title} created for ${data.audience}`);
+          if (data.status === 'Delivered' || data.status === 'Scheduled') {
+            _notifyUsers(_announcementRecipients(data.audience, defaults.department), {
+              type: 'announcement',
+              title: data.title,
+              msg: data.detail,
+              href: 'modules/announcements/board.html',
+              actor: session?.name || 'System',
+            });
+          }
           return { message: 'Announcement created.', refresh: true };
         },
       },
@@ -1142,6 +1151,8 @@ const ModulePage = (() => {
             days: formatDays(data.days),
             status: 'Pending',
             dept: session.department || 'General',
+            startDate: data.start,
+            endDate: data.end,
             detail: `${data.start} to ${data.end}`,
             reason: data.reason,
           });
@@ -1328,6 +1339,57 @@ const ModulePage = (() => {
     if (!Array.isArray(list)) return;
     list.unshift(record);
     window.ASTERAHR.store.persist();
+  }
+
+  function _users() {
+    return window.ASTERAHR?.users || [];
+  }
+
+  function _usersByRole(role) {
+    return _users().filter(user => user.role === role);
+  }
+
+  function _resolveDepartmentManagers(department) {
+    const matches = _users().filter(user => user.role === 'manager' && user.dept === department);
+    return matches.length ? matches : _usersByRole('manager');
+  }
+
+  function _notifyUser(userId, payload = {}) {
+    if (!userId) return;
+    Notify.push({ ...payload, userIds: [userId] });
+  }
+
+  function _notifyUsers(userIds, payload = {}) {
+    const targets = [...new Set((userIds || []).filter(Boolean))];
+    if (!targets.length) return;
+    Notify.push({ ...payload, userIds: targets });
+  }
+
+  function _notifyRole(role, payload = {}) {
+    _notifyUsers(_usersByRole(role).map(user => user.id), payload);
+  }
+
+  function _notifyHR(payload = {}) {
+    _notifyUsers(
+      _users().filter(user => user.role === 'hr_admin' || user.role === 'hr_officer').map(user => user.id),
+      payload
+    );
+  }
+
+  function _notifyManagersForDepartment(department, payload = {}) {
+    _notifyUsers(_resolveDepartmentManagers(department).map(user => user.id), payload);
+  }
+
+  function _announcementRecipients(audience, department) {
+    if (audience === 'All employees') return _users().map(user => user.id);
+    if (audience === 'Leadership') {
+      return _users()
+        .filter(user => user.role === 'manager' || user.role === 'hr_admin' || user.role === 'hr_officer')
+        .map(user => user.id);
+    }
+    return _users()
+      .filter(user => user.dept === department || user.role === 'manager' && user.dept === department)
+      .map(user => user.id);
   }
 
   function downloadTextFile(filename, content) {
@@ -2183,6 +2245,22 @@ const ModulePage = (() => {
     });
     const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_ENROL', `Enrolled in ${course?.title || courseId}`);
+    _notifyUser(session?.userId, {
+      type: 'training',
+      title: 'Training enrolment confirmed',
+      msg: `You are enrolled in ${course?.title || 'the selected course'}.`,
+      href: 'modules/training/catalogue.html',
+      actor: session?.name,
+    });
+    if (course?.required) {
+      _notifyHR({
+        type: 'training',
+        title: 'Mandatory training enrolment',
+        msg: `${session?.name || 'An employee'} enrolled in required learning: ${course.title}.`,
+        href: 'modules/training/catalogue.html',
+        actor: session?.name,
+      });
+    }
     Toast.success(`Enrolled in ${course?.title || 'course'}.`);
     _refreshCatalogueModal();
     init();
@@ -2224,6 +2302,22 @@ const ModulePage = (() => {
     });
     const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_COMPLETE', `Completed ${course?.title || courseId}`);
+    _notifyUser(session?.userId, {
+      type: 'training',
+      title: 'Training completed',
+      msg: `You marked ${course?.title || 'your course'} as complete.`,
+      href: 'modules/training/catalogue.html',
+      actor: session?.name,
+    });
+    if (course?.required) {
+      _notifyHR({
+        type: 'training',
+        title: 'Mandatory training completed',
+        msg: `${session?.name || 'An employee'} completed required learning: ${course.title}.`,
+        href: 'modules/training/catalogue.html',
+        actor: session?.name,
+      });
+    }
     Toast.success(`${course?.title || 'Course'} marked as complete. 🎉`);
     _refreshCatalogueModal();
     init();
@@ -2232,15 +2326,18 @@ const ModulePage = (() => {
   function documentsData(page, session) {
     const records = scopeRecords(recordsFor('documents'), session);
     if (!records.length) return page;
+    const availableCount = records.filter(r => r.status === 'Available' || r.status === 'Uploaded').length;
+    const uploadCount = records.filter(r => r.status === 'Requested' || r.status === 'Pending').length;
+    const scopedCount = records.filter(r => !r.public).length;
     return {
       ...page,
       stats: [
-        stat(records.length, 'Accessible documents', 'Filtered by access', 'slate', '📄'),
-        stat(records.filter(r => r.public).length, 'Public docs', 'Shared company records', 'indigo', '📘'),
-        stat(records.filter(r => !r.public).length, 'Scoped docs', 'Personal or department-specific', 'gold', '📎'),
+        stat(records.length, 'Accessible documents', 'Filtered by your current role', 'slate', '📄'),
+        stat(availableCount, 'Ready to download', 'Available or already uploaded', 'indigo', '📘'),
+        stat(uploadCount, 'Need submission', scopedCount ? `${scopedCount} scoped document${scopedCount === 1 ? '' : 's'}` : 'No restricted files', 'gold', '📎'),
       ],
-      rows: records.slice(0, 3).map(r => [r.title, `${r.type} · ${r.context}`, '📄']),
-      tableRows: records.slice(0, 3).map(r => [r.title, r.type, r.status, r.context]),
+      rows: records.slice(0, 3).map(r => [r.title, `${r.type} · ${r.context}`, _docMeta(r).icon]),
+      tableRows: records.map(r => [r.title, r.type, r.status, r.context]),
       _docRecords: records,
       _docSession: session,
     };
@@ -2257,6 +2354,32 @@ const ModulePage = (() => {
     'Personal follow-up': { icon: '🪪', color: '#B91C1C' },
   };
 
+  function _docMeta(doc) {
+    return DOC_ICONS[doc.type] || { icon: '📄', color: '#5A6B85' };
+  }
+
+  function _docTitleKey(title) {
+    return String(title || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+
+  function _docScopeLabel(doc, session) {
+    if (doc.public) return 'All staff';
+    if (doc.userId && doc.userId === session?.userId) return 'My record';
+    if (doc.dept) return `${doc.dept} department`;
+    return 'Restricted';
+  }
+
+  function _ensureDocReference(doc) {
+    if (doc.docRef) return doc.docRef;
+    const seed = `${slugify(doc.title)}-${slugify(doc.type)}-${slugify(doc.userId || doc.dept || doc.context || 'global')}`;
+    doc.docRef = `DOC-${seed.slice(0, 18).toUpperCase()}`;
+    return doc.docRef;
+  }
+
   function _docStatusBadge(status) {
     const map = {
       'Available': { bg: 'rgba(0,107,66,.10)',  color: '#006B42' },
@@ -2272,21 +2395,23 @@ const ModulePage = (() => {
   function _generateDocContent(doc, session) {
     const now = new Date().toLocaleString('en-KE', { dateStyle: 'long', timeStyle: 'short' });
     const org  = 'AsteraHR Ltd';
+    const titleKey = _docTitleKey(doc.title);
+    const reference = _ensureDocReference(doc);
 
     const templates = {
-      'Employee handbook': `${org} — Employee Handbook v3.2\n${'═'.repeat(48)}\n\nEffective: January 2025  |  Review date: January 2026\n\n1. WELCOME\n   This handbook sets out the policies, expectations, and benefits that apply to all employees of ${org}.\n\n2. CODE OF CONDUCT\n   All employees are expected to act with integrity, respect colleagues, and maintain confidentiality.\n\n3. WORKING HOURS\n   Standard hours: 08:00–17:00, Monday–Friday. Flexible arrangements require manager approval.\n\n4. LEAVE ENTITLEMENT\n   Annual leave: 21 days | Sick leave: 14 days | Maternity: 90 days | Paternity: 14 days.\n\n5. PERFORMANCE REVIEWS\n   Conducted twice yearly (Q2 and Q4). Self-assessments are required before each cycle opens.\n\n6. GRIEVANCE PROCEDURE\n   Issues should first be raised with your line manager. HR provides escalation support.\n\n${'─'.repeat(48)}\nDownloaded by: ${session.name}  |  ${now}\nDocument ID: EH-2025-v3.2`,
+      'employee handbook': `${org} — Employee Handbook\n${'═'.repeat(56)}\nReference: ${reference}\nEffective: January 2025\nReview cycle: Annual\n\n1. Employment Foundations\n   This handbook outlines employment standards, governance expectations, and day-to-day workplace principles for all AsteraHR employees.\n\n2. Workplace Conduct\n   Every employee is expected to act professionally, protect confidential information, and support a respectful, inclusive working environment.\n\n3. Hours, Attendance, and Flexibility\n   Standard working hours are 08:00 to 17:00, Monday to Friday. Flexible schedules, remote days, and overtime require prior approval through the ERP workflow.\n\n4. Leave and Time Away\n   Staff should use the leave module for annual, sick, family, and special leave requests. Managers are expected to respond within two working days.\n\n5. Performance and Growth\n   Performance conversations run through mid-year and end-year cycles, supported by goal tracking, self-assessments, and manager feedback.\n\n6. Safety, Grievance, and Escalation\n   Employees should report workplace concerns early. Issues may be raised with a line manager, HR officer, or HR administrator depending on sensitivity.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`,
 
-      'Code of conduct': `${org} — Code of Conduct\n${'═'.repeat(48)}\n\n1. INTEGRITY\n   Act honestly in all dealings, internal and external.\n\n2. RESPECT\n   Maintain a professional, inclusive environment. Discrimination and harassment are grounds for dismissal.\n\n3. CONFIDENTIALITY\n   Do not share client, employee, or proprietary information outside authorised channels.\n\n4. CONFLICTS OF INTEREST\n   Disclose any personal interests that may conflict with your duties.\n\n5. USE OF COMPANY RESOURCES\n   IT systems, facilities, and budgets must be used for business purposes only.\n\n6. REPORTING VIOLATIONS\n   Use the anonymous reporting channel or speak directly with HR.\n\n${'─'.repeat(48)}\nDownloaded by: ${session.name}  |  ${now}`,
+      'code of conduct': `${org} — Code of Conduct\n${'═'.repeat(56)}\nReference: ${reference}\n\n1. Act with integrity in all business, employee, and system interactions.\n2. Treat colleagues, clients, and partners with respect and professionalism.\n3. Protect confidential, personal, and proprietary information at all times.\n4. Disclose conflicts of interest before they affect decisions or approvals.\n5. Use company funds, systems, and records only for authorized work purposes.\n6. Report misconduct, fraud, harassment, or unsafe behavior through approved channels.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`,
 
-      'Leave policy': `${org} — Leave Policy 2025\n${'═'.repeat(48)}\n\nANNUAL LEAVE\n   Entitlement: 21 working days per calendar year.\n   Accrual: 1.75 days per month from date of joining.\n   Carryover: Up to 5 days may be carried into the next year.\n   Request process: Submit via the HR portal with at least 5 working days' notice.\n\nSICK LEAVE\n   Entitlement: 14 days per year (first 7 at full pay, next 7 at half pay).\n   A medical certificate is required for absences exceeding 3 consecutive days.\n\nMATERNITY LEAVE\n   90 calendar days at full pay, available after 6 months of continuous employment.\n\nPATERNITY LEAVE\n   14 calendar days at full pay upon birth or adoption of a child.\n\nBEREAVEMENT LEAVE\n   Immediate family: 5 days. Extended family: 3 days. No deduction from annual leave.\n\n${'─'.repeat(48)}\nDownloaded by: ${session.name}  |  ${now}`,
+      'leave policy': `${org} — Leave Policy\n${'═'.repeat(56)}\nReference: ${reference}\n\nANNUAL LEAVE\n   Entitlement: 21 working days per calendar year.\n   Accrual: 1.75 days per completed month of service.\n   Notice: Submit at least 5 working days before the intended start date unless exceptional circumstances apply.\n\nSICK LEAVE\n   Entitlement: 14 days per year.\n   Pay treatment: First 7 days at full pay, next 7 days at half pay.\n   Supporting records: A medical note is required for absences above 3 consecutive working days.\n\nMATERNITY LEAVE\n   Entitlement: 90 calendar days at full pay, in line with company policy and local employment obligations.\n\nPATERNITY LEAVE\n   Entitlement: 14 calendar days at full pay for birth or legal adoption placement.\n\nBEREAVEMENT LEAVE\n   Immediate family: 5 working days.\n   Extended family: 3 working days.\n   Approval route: Manager review with HR visibility for record keeping.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`,
 
-      'Manager handbook': `${org} — Manager Handbook\n${'═'.repeat(48)}\n\nYOUR RESPONSIBILITIES\n   As a manager at ${org}, you are responsible for:\n   • Setting clear goals and expectations for your team\n   • Conducting bi-annual performance reviews\n   • Approving leave requests within 2 working days\n   • Handling team disciplinary matters at first stage\n\nAPPROVAL AUTHORITIES\n   Leave requests: Approve up to 10 consecutive days independently.\n   Overtime: Approve up to 20 hours per month per employee.\n   Recruitment: Initiate requisitions; HR approves and manages process.\n\nPERFORMANCE REVIEWS\n   Submit manager reviews within 5 days of the employee's self-assessment.\n   Growth plans should be agreed within 2 weeks of the review cycle closing.\n\nESCALATION PATH\n   Disciplinary matters beyond first stage → HR Business Partner.\n   Safeguarding concerns → HR Director immediately.\n\n${'─'.repeat(48)}\nDownloaded by: ${session.name}  |  ${now}`,
+      'manager handbook': `${org} — Manager Handbook\n${'═'.repeat(56)}\nReference: ${reference}\n\nCORE RESPONSIBILITIES\n   Managers are responsible for team planning, attendance oversight, timely leave decisions, documentation follow-up, and performance coaching.\n\nAPPROVAL AUTHORITIES\n   Managers may approve routine leave, attendance corrections, and team scheduling actions within their delegated departmental scope.\n\nPEOPLE OVERSIGHT\n   Maintain accurate team records, confirm onboarding readiness, and escalate missing employee documentation before payroll cut-off.\n\nPERFORMANCE EXPECTATIONS\n   Complete manager reviews promptly, document feedback clearly, and support measurable growth plans for direct reports.\n\nRISK AND COMPLIANCE\n   Flag policy breaches, safeguarding concerns, or sensitive conduct matters to HR immediately when they exceed normal line-management handling.\n\nESCALATION PATH\n   Team issue -> Line manager -> HR Officer / HR Administrator -> Executive or compliance owner where needed.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`,
 
-      'Signed contract': `${org} — Employment Contract (Copy)\n${'═'.repeat(48)}\n\nEmployee:   ${session.name}\nDepartment: ${session.department || 'General'}\nJob title:  ${session.title || 'Staff'}\nContract:   Permanent — full time\nStart date: 01 March 2023\n\nSALARY\n   Basic: As per payroll schedule\n   Review date: April annually\n\nNOTICE PERIOD\n   Either party must give 30 days' written notice.\n\nCONFIDENTIALITY\n   Employee agrees to maintain confidentiality of all proprietary information during and after employment.\n\nSIGNATURES\n   Employee: ${session.name}             Date: 01 March 2023\n   HR Director: J. Mwangi               Date: 01 March 2023\n\n${'─'.repeat(48)}\nThis is an employee copy. Original retained by HR.\nDownloaded by: ${session.name}  |  ${now}`,
+      'signed contract': `${org} — Signed Contract Copy\n${'═'.repeat(56)}\nReference: ${reference}\n\nEmployee Name: ${session.name}\nDepartment: ${session.department || 'General'}\nJob Title: ${session.title || 'Staff'}\nEmployment Type: Permanent, full time\nRecord Status: Employee copy generated from the document repository\n\nTERMS SUMMARY\n   Compensation, benefits, confidentiality, conduct expectations, and notice obligations follow the signed employment agreement retained by HR.\n\nPOSITION AND REPORTING\n   The employee serves in the role of ${session.title || 'Staff'} within the ${session.department || 'General'} department and reports according to the current organisational structure.\n\nNOTICE PERIOD\n   Either party must provide written notice in accordance with the executed agreement and prevailing policy requirements.\n\nCONFIDENTIALITY\n   The employee remains bound by confidentiality, data protection, and acceptable-use obligations during and after employment.\n\nACKNOWLEDGEMENT\n   This repository copy is issued for ${session.name}. The signed original remains on the official personnel file.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`,
     };
 
-    return templates[doc.title] ||
-      `${org} — ${doc.title}\n${'═'.repeat(48)}\n\nDocument type: ${doc.type}\nAccess level:  ${doc.public ? 'All staff' : doc.dept || 'Restricted'}\nStatus:        ${doc.status}\n\n[Document content would be retrieved from the document management system in a live environment.]\n\n${'─'.repeat(48)}\nDownloaded by: ${session.name}  |  ${now}\nDocument reference: DOC-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    return templates[titleKey] ||
+      `${org} — ${doc.title}\n${'═'.repeat(56)}\nReference: ${reference}\n\nDocument type: ${doc.type}\nStatus: ${doc.status}\nAccess scope: ${_docScopeLabel(doc, session)}\nContext: ${doc.context || 'Repository record'}\nSubmitted reference: ${doc.ref || 'Not provided'}\nSubmitted note: ${doc.note || 'None'}\nSubmitted at: ${doc.submittedAt ? Fmt.dateTime(doc.submittedAt) : 'Not recorded'}\n\nThis file was generated from the document repository as a coherent fallback export.\nIt captures the metadata currently stored for this accessible record.\n\n${'─'.repeat(56)}\nDownloaded by: ${session.name}\nDownloaded on: ${now}\nDocument ID: ${reference}`;
   }
 
   let _currentDocRecords = null;
@@ -2302,9 +2427,12 @@ const ModulePage = (() => {
 
   function renderDocTableRows(records, session) {
     return records.map((doc, idx) => {
-      const meta  = DOC_ICONS[doc.type] || { icon: '📄', color: '#5A6B85' };
+      const meta  = _docMeta(doc);
       const canDownload = doc.status === 'Available' || doc.status === 'Uploaded';
       const needsFulfil = doc.status === 'Requested' || doc.status === 'Pending';
+      const scopeLabel = _docScopeLabel(doc, session);
+      const typeLabel = doc.type || 'Document';
+      const contextLabel = doc.context || 'Repository record';
 
       const actionBtn = canDownload
         ? `<button class="btn btn-navy btn-sm" onclick="ModulePage.downloadDoc(${idx})" style="white-space:nowrap">
@@ -2316,20 +2444,20 @@ const ModulePage = (() => {
              </button>`
           : `<span style="font-size:12px;color:var(--ink-mu)">—</span>`;
 
-      return `
+        return `
         <tr>
           <td>
             <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:20px;flex-shrink:0">${meta.icon}</span>
-              <div>
+              <span style="width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${meta.color}18;color:${meta.color};font-size:18px">${meta.icon}</span>
+              <div style="min-width:0">
                 <div style="font-size:13px;font-weight:600;color:var(--ink)">${doc.title}</div>
-                <div style="font-size:11.5px;color:var(--ink-mu);margin-top:1px">${doc.context}</div>
+                <div style="font-size:11.5px;color:var(--ink-mu);margin-top:1px">${contextLabel}</div>
               </div>
             </div>
           </td>
-          <td><span style="font-size:12.5px;color:var(--ink-s)">${doc.type}</span></td>
+          <td><span style="font-size:12.5px;color:var(--ink-s);font-weight:500">${typeLabel}</span></td>
           <td>${_docStatusBadge(doc.status)}</td>
-          <td>${doc.public ? '<span style="font-size:11.5px;color:var(--ink-mu)">🌐 All staff</span>' : `<span style="font-size:11.5px;color:var(--ink-mu)">🔒 Scoped</span>`}</td>
+          <td><span style="font-size:11.5px;color:var(--ink-mu)">${doc.public ? '🌐' : '🔒'} ${scopeLabel}</span></td>
           <td style="text-align:right">${actionBtn}</td>
         </tr>`;
     }).join('');
@@ -2382,15 +2510,7 @@ const ModulePage = (() => {
 
     const content  = _generateDocContent(doc, session);
     const filename = doc.title.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.txt';
-    const blob     = new Blob([content], { type: 'text/plain' });
-    const url      = URL.createObjectURL(blob);
-    const a        = document.createElement('a');
-    a.href         = url;
-    a.download     = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadTextFile(filename, content);
 
     Session.audit('DOCUMENT_DOWNLOAD', `${doc.title} downloaded by ${session.name}`);
     Toast.success(`"${doc.title}" downloaded.`);
@@ -2411,35 +2531,60 @@ const ModulePage = (() => {
 
   function confirmFulfilDoc() {
     const ref = document.getElementById('fulfil-doc-ref')?.value?.trim();
+    const note = document.getElementById('fulfil-doc-notes')?.value?.trim() || '';
     if (!ref) { Toast.error('Please enter a reference or note.'); return; }
 
     const session = _currentDocSession || Session.get();
-    const doc     = _currentDocRecords?.[_pendingFulfilIdx];
+    const pendingIdx = _pendingFulfilIdx;
+    const doc     = _currentDocRecords?.[pendingIdx];
     if (!doc) return;
 
     // Mark the record as uploaded/available in the live dataset
     const allDocs = window.ASTERAHR?.moduleData?.documents;
     if (allDocs) {
-      const liveDoc = allDocs.find(d => d.title === doc.title && (d.userId === doc.userId || d.public === doc.public));
+      const liveDoc = allDocs.find(d =>
+        d.title === doc.title &&
+        d.type === doc.type &&
+        d.context === doc.context &&
+        d.userId === doc.userId &&
+        d.public === doc.public &&
+        d.dept === doc.dept
+      );
       if (liveDoc) {
         liveDoc.status  = 'Uploaded';
-        liveDoc.context = `Submitted by ${session.name}`;
+        liveDoc.context = note ? `Submitted by ${session.name} · ${note}` : `Submitted by ${session.name}`;
         liveDoc.ref     = ref;
+        liveDoc.note    = note;
         liveDoc.submittedAt = new Date().toISOString();
+        _ensureDocReference(liveDoc);
       }
       window.ASTERAHR.store.persist();
     }
 
-    Session.audit('DOCUMENT_SUBMITTED', `${doc.title} submitted by ${session.name} — ref: ${ref}`);
+    Session.audit('DOCUMENT_UPLOAD', `${doc.title} uploaded by ${session.name} — ref: ${ref}`);
+    _notifyHR({
+      type: 'document',
+      title: 'Document submitted',
+      msg: `${session.name} submitted ${doc.title} (${ref}).`,
+      href: 'modules/documents/repository.html',
+      actor: session.name,
+    });
     closeModal('fulfil-doc-modal');
     Toast.success(`"${doc.title}" submitted successfully.`);
-    _pendingFulfilIdx = null;
 
     // Refresh the in-memory records and table
     if (_currentDocRecords) {
-      const rec = _currentDocRecords[_pendingFulfilIdx !== null ? _pendingFulfilIdx : 0];
-      if (rec) { rec.status = 'Uploaded'; rec.context = `Submitted by ${session.name}`; }
+      const rec = _currentDocRecords[pendingIdx];
+      if (rec) {
+        rec.status = 'Uploaded';
+        rec.context = note ? `Submitted by ${session.name} · ${note}` : `Submitted by ${session.name}`;
+        rec.ref = ref;
+        rec.note = note;
+        rec.submittedAt = new Date().toISOString();
+        _ensureDocReference(rec);
+      }
     }
+    _pendingFulfilIdx = null;
     init();
   }
 
@@ -2693,7 +2838,7 @@ const ModulePage = (() => {
 
     const columns = isLeave ? ['Employee', 'Type', 'Duration', 'Status', 'Context']
                   : isAtt   ? ['Employee', 'Event', 'Status', 'Context', 'Department']
-                  : isDoc   ? ['Document', 'Type', 'Status', 'Access', '']
+                  : isDoc   ? ['Document', 'Type', 'Status', 'Access Scope', '']
                   : tableColumns(page);
 
     const approverNote = (isLeave && page._leaveApprover) || (isAtt && page._attendanceApprover)
@@ -3613,6 +3758,13 @@ const ModulePage = (() => {
     record.resolvedAt = new Date().toISOString();
     window.ASTERAHR.store.persist();
     Session.audit('ATTENDANCE_RESOLVED', `${record.event} for ${record.name} resolved`);
+    _notifyUser(record.userId, {
+      type: 'attendance',
+      title: 'Attendance correction resolved',
+      msg: `${record.event} was resolved by ${session.name}.`,
+      href: 'modules/attendance/register.html',
+      actor: session.name,
+    });
     Toast.success(`Correction resolved for ${record.name}.`);
     _refreshAttendanceTable();
   }
@@ -3643,6 +3795,13 @@ const ModulePage = (() => {
     record.rejectReason = reason;
     window.ASTERAHR.store.persist();
     Session.audit('ATTENDANCE_REJECTED', `${record.event} for ${record.name} rejected — ${reason}`);
+    _notifyUser(record.userId, {
+      type: 'attendance',
+      title: 'Attendance correction rejected',
+      msg: `${record.event} was rejected by ${session.name}: ${reason}`,
+      href: 'modules/attendance/register.html',
+      actor: session.name,
+    });
     closeModal('att-reject-modal');
     Toast.warning(`Correction rejected for ${record.name}.`);
     _pendingAttRejectIdx = null;
@@ -4091,6 +4250,13 @@ const ModulePage = (() => {
     }
 
     Session.audit('SELF_REVIEW_SUBMIT', `Q2 self assessment submitted${avgRating ? ` (avg ${avgRating}/5)` : ''}`);
+    _notifyManagersForDepartment(session.department, {
+      type: 'performance',
+      title: 'Self review submitted',
+      msg: `${session.name} submitted a self assessment and is awaiting manager feedback.`,
+      href: 'modules/performance/appraisals.html',
+      actor: session.name,
+    });
     closeModal('self-review-modal');
     Toast.success('Self assessment submitted. Your manager has been notified.');
     init();
@@ -4128,6 +4294,16 @@ const ModulePage = (() => {
     }
 
     Session.audit('MANAGER_REVIEW_SUBMIT', `Manager review submitted by ${session.name}`);
+    if (all && _pendingManagerReviewIdx !== null) {
+      const record = all[_pendingManagerReviewIdx];
+      _notifyUser(record?.userId, {
+        type: 'performance',
+        title: 'Manager review submitted',
+        msg: `${session.name} completed your performance review feedback.`,
+        href: 'modules/performance/appraisals.html',
+        actor: session.name,
+      });
+    }
     closeModal('manager-review-form-modal');
     closeModal('manager-review-modal');
     Toast.success('Manager review submitted successfully.');
@@ -4193,6 +4369,13 @@ const ModulePage = (() => {
     record.approvedAt = new Date().toISOString();
     window.ASTERAHR.store.persist();
     Session.audit('LEAVE_APPROVED', `${record.type} for ${record.name} approved`);
+    _notifyUser(record.userId, {
+      type: 'leave',
+      title: 'Leave request approved',
+      msg: `${record.type} was approved by ${session.name}.`,
+      href: 'modules/leave/requests.html',
+      actor: session.name,
+    });
     Toast.success(`Leave approved for ${record.name}.`);
     _refreshLeaveTable();
   }
@@ -4223,6 +4406,13 @@ const ModulePage = (() => {
     record.rejectReason = reason;
     window.ASTERAHR.store.persist();
     Session.audit('LEAVE_REJECTED', `${record.type} for ${record.name} rejected — ${reason}`);
+    _notifyUser(record.userId, {
+      type: 'leave',
+      title: 'Leave request rejected',
+      msg: `${record.type} was rejected by ${session.name}: ${reason}`,
+      href: 'modules/leave/requests.html',
+      actor: session.name,
+    });
     closeModal('leave-reject-modal');
     Toast.warning(`Leave rejected for ${record.name}.`);
     _pendingRejectIdx = null;
