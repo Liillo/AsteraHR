@@ -23,7 +23,7 @@ const RBAC = (() => {
       items: [
         { key: 'employees', icon: '👥', label: 'Employees', perm: ['employees', 'view'], roles: ['hr_admin', 'hr_officer', 'manager'] },
         { key: 'my-profile', icon: '🧾', label: 'My Profile', roles: ['hr_admin', 'hr_officer', 'manager', 'employee', 'it_admin'] },
-        { key: 'org-chart', icon: '🗂', label: 'Org Chart', perm: ['employees', 'view'], roles: ['hr_admin', 'hr_officer', 'manager'] },
+        { key: 'org-chart', icon: '🗂', label: 'Org Chart', roles: ['hr_admin', 'hr_officer', 'manager', 'employee', 'it_admin'] },
         { key: 'ats', icon: '🔗', label: 'ATS Bridge', perm: ['ats', 'view'], roles: ['hr_admin', 'it_admin'] },
       ],
     },

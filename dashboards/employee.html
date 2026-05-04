@@ -356,6 +356,7 @@
 <script src="../assets/js/session.js"></script>
 <script src="../assets/js/rbac.js"></script>
 <script src="../assets/js/shell.js"></script>
+<script src="../assets/js/dashboard-tools.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const session = Shell.init({
@@ -366,6 +367,15 @@
     });
     if (!session) return;
     document.getElementById('page-content').style.display = 'block';
+    DashboardTools.init({
+      storageKey: 'dashboard-employee',
+      shortcuts: [
+        '../modules/attendance/register.html',
+        '../modules/leave/requests.html',
+        '../modules/payroll/payslips.html',
+        '../modules/training/catalogue.html',
+      ],
+    });
   });
 </script>
 </body>

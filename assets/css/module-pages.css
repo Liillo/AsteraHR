@@ -163,6 +163,106 @@
   gap: 20px;
 }
 
+.announcement-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.announcement-card {
+  padding: 16px;
+  border: 1px solid var(--bdr-s);
+  border-radius: var(--r);
+  background: var(--white);
+  box-shadow: var(--sh-c);
+}
+
+.announcement-card-head,
+.announcement-card-foot,
+.announcement-row-actions,
+.announcement-modal-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.announcement-card-head,
+.announcement-card-foot {
+  justify-content: space-between;
+}
+
+.announcement-card-head span:last-child,
+.announcement-card-foot span,
+.announcement-delivery span {
+  font-size: 11.5px;
+  color: var(--ink-mu);
+}
+
+.announcement-card h3 {
+  margin: 12px 0 6px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.announcement-card p {
+  min-height: 52px;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-s);
+}
+
+.announcement-delivery {
+  display: grid;
+  gap: 2px;
+}
+
+.announcement-delivery strong {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.announcement-row-actions {
+  flex-wrap: wrap;
+}
+
+.announcement-modal-meta {
+  flex-wrap: wrap;
+}
+
+.announcement-modal-meta span {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--parch);
+  font-size: 11.5px;
+  color: var(--ink-s);
+}
+
+.announcement-replies {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.announcement-reply {
+  padding: 10px 12px;
+  border: 1px solid var(--bdr-s);
+  border-radius: var(--r);
+  background: var(--parch);
+}
+
+.announcement-reply strong,
+.announcement-reply span {
+  display: block;
+  font-size: 12px;
+}
+
+.announcement-reply span {
+  margin-top: 3px;
+  color: var(--ink-s);
+}
+
 .operations-hero {
   display: grid;
   grid-template-columns: 1.25fr .95fr;
@@ -203,6 +303,57 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+}
+
+.profile-directory-card {
+  margin-top: 16px;
+}
+
+.profile-employee-select {
+  width: 100%;
+  border: 1px solid var(--bdr-s);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--white);
+}
+
+.profile-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.profile-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.profile-detail-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bdr-s);
+}
+
+.profile-detail-item:last-child {
+  border-bottom: 0;
+}
+
+.profile-detail-item span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-g);
+  margin-bottom: 3px;
+}
+
+.profile-detail-item strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
 }
 
 .atlas-hero {
@@ -672,21 +823,22 @@
     linear-gradient(180deg, rgba(255,255,255,.99), rgba(241,245,249,.98));
 }
 
-.training-catalogue-hero {
+.training-catalogue-modal .training-catalogue-hero {
   position: relative;
   overflow: hidden;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 10px;
-  padding: 18px 20px 16px;
+  gap: 18px;
+  padding: 24px 26px 22px;
   border-bottom: 1px solid rgba(255,255,255,.14);
+  color: #fff;
   background:
-    radial-gradient(circle at top right, rgba(255,255,255,.26), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(251,191,36,.22), transparent 24%),
-    linear-gradient(135deg, #0f766e 0%, #0ea5a4 30%, #22c55e 58%, #2563eb 100%);
+    radial-gradient(circle at 88% 18%, rgba(255,255,255,.26), transparent 22%),
+    radial-gradient(circle at 12% 94%, rgba(251,191,36,.22), transparent 26%),
+    linear-gradient(135deg, #062f2d 0%, #0f766e 38%, #166534 68%, #1e3a8a 100%) !important;
 }
 
-.training-catalogue-hero::after {
+.training-catalogue-modal .training-catalogue-hero::after {
   content: "";
   position: absolute;
   inset: auto -30px -36px auto;
@@ -697,7 +849,7 @@
   transform: rotate(18deg);
 }
 
-.training-catalogue-hero::before {
+.training-catalogue-modal .training-catalogue-hero::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -713,51 +865,65 @@
   pointer-events: none;
 }
 
-.training-catalogue-hero > div:first-child {
+.training-catalogue-modal .training-catalogue-hero > div:first-child {
   position: relative;
   z-index: 1;
   max-width: 500px;
 }
 
-.training-catalogue-hero .module-eyebrow {
-  color: #f8fafc;
-  background: rgba(255,255,255,.18);
-  border: 1px solid rgba(255,255,255,.18);
+.training-catalogue-modal .training-catalogue-hero .module-eyebrow,
+.training-catalogue-eyebrow {
+  color: #fff !important;
+  background: rgba(255,255,255,.2);
+  border: 1px solid rgba(255,255,255,.28);
   box-shadow: 0 10px 24px rgba(9,24,48,.14);
 }
 
-.training-catalogue-hero h2 {
-  font-size: 30px;
+.training-catalogue-title {
+  font-size: 34px;
   line-height: 1.04;
-  margin-bottom: 10px;
-  color: #fff;
+  margin: 10px 0 10px;
+  color: #fff !important;
   text-shadow: 0 8px 24px rgba(9,24,48,.22);
 }
 
-.training-catalogue-hero p {
+.training-catalogue-copy {
   max-width: 460px;
-  color: rgba(255,255,255,.9);
+  margin: 0;
+  color: rgba(255,255,255,.94) !important;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
-.training-catalogue-hero .admin-modal-hero-badge {
+.training-catalogue-modal .training-catalogue-hero .admin-modal-hero-badge,
+.training-catalogue-badge {
   position: relative;
   z-index: 1;
-  min-width: 172px;
-  padding: 12px 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.1));
-  border-color: rgba(255,255,255,.24);
+  min-width: 190px;
+  padding: 15px 16px;
+  background: linear-gradient(180deg, rgba(6,47,45,.44), rgba(15,23,42,.28));
+  border-color: rgba(255,255,255,.34);
   box-shadow: 0 18px 34px rgba(9,24,48,.14);
   backdrop-filter: blur(8px);
 }
 
-.training-catalogue-hero .admin-modal-hero-badge span {
+.training-catalogue-modal .training-catalogue-hero .admin-modal-hero-badge span {
   background: rgba(255,255,255,.22);
   color: #fff;
 }
 
-.training-catalogue-hero .admin-modal-hero-badge strong,
-.training-catalogue-hero .admin-modal-hero-badge div {
+.training-catalogue-modal .training-catalogue-hero .admin-modal-hero-badge strong,
+.training-catalogue-modal .training-catalogue-hero .admin-modal-hero-badge div,
+.training-catalogue-badge small {
   color: #fff;
+}
+
+.training-catalogue-badge small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(255,255,255,.78);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .training-tabs {
@@ -860,12 +1026,56 @@
   border-top: 1px solid var(--bdr-s);
 }
 
+.training-enrolment-progress {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid rgba(15,118,110,.12);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(240,253,250,.82), rgba(255,255,255,.94));
+}
+
+.training-enrolment-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.training-enrolment-progress-head span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-mu);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.training-enrolment-progress-head strong {
+  font-size: 12px;
+  color: #0f766e;
+}
+
+.training-enrolment-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(15,23,42,.08);
+}
+
+.training-enrolment-progress-fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f766e, #22c55e);
+  transition: width .24s ease;
+}
+
 @media (max-width: 900px) {
-  .training-catalogue-hero {
+  .training-catalogue-modal .training-catalogue-hero {
     grid-template-columns: 1fr;
   }
 
-  .training-catalogue-hero .admin-modal-hero-badge {
+  .training-catalogue-modal .training-catalogue-hero .admin-modal-hero-badge {
     justify-self: start;
     min-width: 0;
   }
@@ -1154,6 +1364,157 @@
   outline: none;
 }
 
+.admin-modal-workflow .admin-field select {
+  min-height: 42px;
+  padding: 0 38px 0 12px;
+  border: 1px solid rgba(15,23,42,.1);
+  border-radius: 12px;
+  background-color: rgba(255,255,255,.82);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='8' viewBox='0 0 13 8'%3E%3Cpath d='M1.4 1.5 6.5 6.4l5.1-4.9' stroke='%2364758b' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+  cursor: pointer;
+  appearance: none;
+  transition: border-color .16s, box-shadow .16s, background-color .16s;
+}
+
+.admin-modal-workflow .admin-field select:hover {
+  border-color: rgba(15,23,42,.22);
+  background-color: #fff;
+}
+
+.admin-modal-workflow .admin-field select:focus {
+  border-color: var(--admin-modal-accent, var(--module-accent));
+  background-color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 0 0 3px var(--admin-modal-soft, var(--module-soft));
+}
+
+.admin-modal-workflow .admin-field select[multiple] {
+  height: auto;
+  min-height: 118px;
+  padding: 8px;
+  background-image: none;
+  overflow: auto;
+}
+
+.admin-modal-workflow .admin-field select[multiple] option {
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+
+.admin-modal-workflow .admin-field select[multiple] option:checked {
+  color: #fff;
+  background: var(--admin-modal-accent, var(--module-accent));
+}
+
+.workflow-dropdown {
+  position: relative;
+}
+
+.workflow-dropdown-trigger {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 38px 0 12px;
+  border: 1px solid rgba(15,23,42,.1);
+  border-radius: 12px;
+  background-color: rgba(255,255,255,.82);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='8' viewBox='0 0 13 8'%3E%3Cpath d='M1.4 1.5 6.5 6.4l5.1-4.9' stroke='%2364758b' stroke-width='1.7' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color .16s, box-shadow .16s, background-color .16s;
+}
+
+.workflow-dropdown-trigger:hover,
+.admin-field.is-open .workflow-dropdown-trigger {
+  border-color: rgba(15,23,42,.22);
+  background-color: #fff;
+}
+
+.admin-field.is-open .workflow-dropdown-trigger {
+  border-color: var(--admin-modal-accent, var(--module-accent));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    0 0 0 3px var(--admin-modal-soft, var(--module-soft));
+}
+
+.workflow-dropdown-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  display: none;
+  max-height: 220px;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid rgba(15,23,42,.1);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15,23,42,.16);
+}
+
+.admin-field.is-open .workflow-dropdown-menu {
+  display: block;
+}
+
+.workflow-dropdown-options {
+  display: grid;
+  gap: 4px;
+}
+
+.workflow-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--ink-s);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.workflow-dropdown-option:hover {
+  background: var(--admin-modal-soft, var(--module-soft));
+  color: var(--ink);
+}
+
+.workflow-dropdown-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--admin-modal-accent, var(--module-accent));
+}
+
+.workflow-dropdown-option.is-hidden {
+  display: none;
+}
+
+.workflow-dropdown-empty {
+  display: none;
+  padding: 10px;
+  color: var(--ink-mu);
+  font-size: 12.5px;
+}
+
+.workflow-dropdown-empty.is-visible {
+  display: block;
+}
+
+.workflow-field-help {
+  font-size: 11.5px;
+  color: var(--ink-mu);
+  line-height: 1.45;
+}
+
 .admin-field textarea {
   min-height: 110px;
   resize: vertical;
@@ -1273,12 +1634,14 @@
   .finance-hero,
   .studio-hero,
   .module-layout-grid,
+  .profile-sections-grid,
   .module-layout-grid.wide-left {
     grid-template-columns: 1fr;
   }
 
   .atlas-stats,
   .analytics-mini-board,
+  .announcement-board,
   .profile-stat-strip,
   .module-stat-grid,
   .module-stat-grid.three-up,
@@ -1318,6 +1681,7 @@
 
   .atlas-stats,
   .analytics-mini-board,
+  .announcement-board,
   .profile-stat-strip,
   .module-stat-grid,
   .module-stat-grid.three-up,

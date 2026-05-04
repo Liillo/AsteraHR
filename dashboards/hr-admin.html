@@ -291,6 +291,7 @@
 <script src="../assets/js/rbac.js"></script>
 <script src="../assets/js/shell.js"></script>
 <script src="../assets/js/calendar.js"></script>
+<script src="../assets/js/dashboard-tools.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const session = Shell.init({
@@ -303,6 +304,15 @@
     const miniCalendar = document.getElementById('hr-mini-calendar');
     if (miniCalendar) AsteraCalendar.renderMiniCalendar(miniCalendar, session);
     document.getElementById('page-content').style.display = 'block';
+    DashboardTools.init({
+      storageKey: 'dashboard-hr-admin',
+      shortcuts: [
+        '../modules/employees/list.html',
+        '../modules/attendance/register.html',
+        '../modules/payroll/run-payroll.html',
+        '../modules/leave/requests.html',
+      ],
+    });
   });
 
   function approveItem(btn, msg) {

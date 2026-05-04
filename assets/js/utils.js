@@ -303,7 +303,9 @@ function setFgError(fgId, on) {
 function collectForm(formEl) {
   const data = {};
   formEl.querySelectorAll('[name]').forEach(el => {
-    data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+    if (el.type === 'checkbox') data[el.name] = el.checked;
+    else if (el.tagName === 'SELECT' && el.multiple) data[el.name] = [...el.selectedOptions].map(option => option.value);
+    else data[el.name] = el.value;
   });
   return data;
 }

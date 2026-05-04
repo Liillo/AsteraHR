@@ -119,7 +119,7 @@ const ModulePage = (() => {
       allowedRoles: ['hr_admin', 'hr_officer', 'manager', 'employee', 'it_admin'],
       layout: 'profile',
       theme: 'indigo',
-      hero: { icon: '🧾', eyebrow: 'Self Service', title: 'Your record, in one personal view', text: 'Designed like a personal workspace instead of a generic admin page.' },
+      hero: { icon: '🧾', eyebrow: 'Self Service', title: 'Your record, in one personal view', text: 'Your personal workspace.' },
       spotlight: ['Personal record', 'Use this page to verify details before payroll, leave, or compliance updates.'],
       stats: [
         ['94%', 'Profile completion', '2 details still missing', 'indigo', '👤'],
@@ -132,7 +132,6 @@ const ModulePage = (() => {
         ['Bank account', 'Verify salary account details before payroll lock.', '🏦'],
       ],
       actions: [
-        ['Update profile details', 'action:update-profile'],
         ['View payslips', 'modules/payroll/payslips.html'],
         ['Open documents', 'modules/documents/repository.html'],
       ],
@@ -155,7 +154,7 @@ const ModulePage = (() => {
       title: 'Org Chart',
       sub: 'Explore reporting lines, teams, and departmental structure.',
       activeNav: 'org-chart',
-      allowedRoles: ['hr_admin', 'hr_officer', 'manager'],
+      allowedRoles: ['hr_admin', 'hr_officer', 'manager', 'employee', 'it_admin'],
       layout: 'atlas',
       theme: 'teal',
       hero: { icon: '🗂', eyebrow: 'Structure Map', title: 'See the company as a living network', text: 'A map-like presentation makes this page feel different from list-heavy modules.' },
@@ -250,7 +249,7 @@ const ModulePage = (() => {
       title: 'Attendance',
       sub: 'Track clock-ins, presence trends, and attendance exceptions.',
       activeNav: 'attendance',
-      allowedRoles: ['hr_admin', 'hr_officer', 'manager', 'employee'],
+      allowedRoles: ['hr_admin', 'hr_officer', 'manager', 'employee', 'it_admin'],
       layout: 'operations',
       theme: 'teal',
       hero: { icon: '🕐', eyebrow: 'Presence Tracking', title: 'Built around daily rhythm and movement', text: 'The design shifts toward pulse monitoring and operational tempo.' },
@@ -996,35 +995,65 @@ const ModulePage = (() => {
       name: session?.name || 'Current user',
       department: session?.department || 'General',
     };
+    const requestedProfileId = new URLSearchParams(window.location.search).get('userId') || session?.userId;
+    const profileTarget = userById(requestedProfileId) || userById(session?.userId) || {};
+    const profileDefaults = profileFallbacks(profileTarget);
 
     return {
       'create-announcement': {
         tone: 'rose',
         badge: 'Communications',
         title: 'Publish a new announcement',
-        description: 'Draft an update and seed it into the announcements feed.',
+        description: 'Draft an update, choose receivers, and seed it into the announcements feed.',
         buttonLabel: 'Create Announcement',
         noteTitle: 'Adds a visible announcement record',
         noteText: 'The item is saved into the mock dataset and will appear in announcement summaries immediately.',
         fields: [
           { name: 'title', label: 'Announcement title', placeholder: 'Benefits enrolment reminder', full: true, required: true },
           { name: 'detail', label: 'Message', type: 'textarea', placeholder: 'Share the key update for staff.', full: true, required: true },
-          { name: 'audience', label: 'Audience', type: 'select', options: ['All employees', defaults.department, 'Leadership'], required: true },
-          { name: 'status', label: 'Status', type: 'select', options: ['Draft', 'Scheduled', 'Delivered'], required: true },
+          { name: 'audienceType', label: 'Receivers', type: 'select', options: ['Entire organization', 'Departments', 'Specific employees', 'Leadership'], required: true },
+          { name: 'departments', label: 'Departments', type: 'dropdownMulti', options: uniqueDepartments(), help: 'Use this when Receivers is set to Departments.' },
+          { name: 'employees', label: 'Specific employees', type: 'dropdownMulti', options: _users().map(user => ({ value: user.id, label: `${user.name} - ${user.title}`, dept: user.dept || '' })), full: true, help: 'Use this when Receivers is set to Specific employees.' },
+          { name: 'status', label: 'Status', type: 'select', options: ['Draft', 'Scheduled', 'Delivered', 'Needs approval'], required: true },
+          { name: 'actionType', label: 'Action required', type: 'select', options: ['No action required', 'Acknowledge receipt', 'Reply required', 'Manager approval required', 'Upload or attach document', 'Complete assigned task'], required: true },
         ],
         submit(data) {
+          const recipients = resolveAnnouncementRecipients(data, session);
+          if (data.status !== 'Draft' && !recipients.length) {
+            throw new Error('Choose at least one receiver before scheduling or delivering.');
+          }
+          const departments = Array.isArray(data.departments)
+            ? data.departments.filter(Boolean)
+            : String(data.departments || '').split(',').map(item => item.trim()).filter(Boolean);
+          const targetUsers = data.audienceType === 'Specific employees' ? recipients : [];
+          const actionLabel = data.status === 'Needs approval' && data.actionType === 'No action required'
+            ? 'Manager approval required'
+            : data.actionType;
           appendModuleRecord('announcements', {
+            id: `ANN-${Date.now()}`,
             title: data.title,
             detail: data.detail,
-            audience: data.audience,
+            audience: data.audienceType === 'Entire organization' ? 'All employees' : data.audienceType,
+            audienceType: data.audienceType,
+            targetUserIds: targetUsers,
+            departments,
+            deliveredTo: recipients,
+            viewedBy: [],
+            replies: [],
+            requiresAction: actionLabel !== 'No action required' || data.status === 'Needs approval',
+            actionLabel,
+            actionedBy: [],
+            createdBy: session?.userId,
+            createdByName: session?.name,
+            createdAt: new Date().toISOString(),
             status: data.status,
-            context: data.audience === 'All employees' ? 'Company-wide' : defaults.department,
-            public: data.audience === 'All employees',
-            dept: data.audience === 'All employees' ? undefined : defaults.department,
+            context: data.audienceType === 'Entire organization' ? 'Company-wide' : announcementAudienceLabel({ audienceType: data.audienceType, departments, targetUserIds: targetUsers }),
+            public: data.audienceType === 'Entire organization',
+            dept: data.audienceType === 'Departments' && departments.length === 1 ? departments[0] : undefined,
           });
-          Session.audit('ANNOUNCEMENT_CREATE', `${data.title} created for ${data.audience}`);
+          Session.audit('ANNOUNCEMENT_CREATE', `${data.title} created for ${data.audienceType}`);
           if (data.status === 'Delivered' || data.status === 'Scheduled') {
-            _notifyUsers(_announcementRecipients(data.audience, defaults.department), {
+            _notifyUsers(recipients, {
               type: 'announcement',
               title: data.title,
               msg: data.detail,
@@ -1042,27 +1071,66 @@ const ModulePage = (() => {
       },
       'update-profile': {
         tone: 'indigo',
-        badge: 'Profile',
-        title: 'Update your profile details',
-        description: 'Record a new profile change request or self-service update.',
-        buttonLabel: 'Save Profile Update',
-        noteTitle: 'Creates a new profile task',
-        noteText: 'This adds a scoped item to your profile timeline so the page reflects the latest update.',
+        badge: 'HR Profile',
+        title: 'Edit employee details',
+        description: 'Update the selected employee record. This workflow is available to HR roles only.',
+        buttonLabel: 'Save Employee Details',
+        noteTitle: 'Updates employee master data',
+        noteText: 'The edited details are saved to the local demo data and reflected in the profile sections.',
         fields: [
-          { name: 'title', label: 'Update type', placeholder: 'Emergency contact change', required: true },
-          { name: 'detail', label: 'Details', type: 'textarea', placeholder: 'Summarise what changed.', full: true, required: true },
-          { name: 'status', label: 'Status', type: 'select', options: ['Draft', 'Pending', 'Completed'], required: true },
+          { name: 'employeeId', label: 'Employee', type: 'select', options: (window.ASTERAHR.users || []).map(user => ({ value: user.id, label: `${user.name} · ${user.title}` })), value: profileTarget.id || session.userId, required: true },
+          { name: 'name', label: 'Full name', placeholder: 'Grace Achieng', value: profileTarget.name || '' },
+          { name: 'title', label: 'Job title', placeholder: 'Senior Engineer', value: profileTarget.title || '' },
+          { name: 'department', label: 'Department', placeholder: 'Engineering', value: profileTarget.dept || '' },
+          { name: 'email', label: 'Email address', type: 'email', placeholder: 'name@asterahr.co.ke', value: profileTarget.email || '' },
+          { name: 'phone', label: 'Phone number', placeholder: '+254 ...', value: profileDefaults.phone },
+          { name: 'nationalId', label: 'National ID', placeholder: 'ID number', value: profileDefaults.nationalId },
+          { name: 'kraPin', label: 'KRA PIN', placeholder: 'A000000000K', value: profileDefaults.kraPin },
+          { name: 'manager', label: 'Manager', placeholder: 'Samuel Kariuki', value: profileDefaults.manager },
+          { name: 'employmentType', label: 'Employment type', placeholder: 'Permanent', value: profileDefaults.employmentType },
+          { name: 'startDate', label: 'Start date', placeholder: '08 Jan 2022', value: profileDefaults.startDate },
+          { name: 'location', label: 'Work location', placeholder: 'Nairobi HQ', value: profileDefaults.location },
+          { name: 'emergencyContact', label: 'Emergency contact', placeholder: 'Contact name', value: profileDefaults.emergencyContact },
+          { name: 'emergencyPhone', label: 'Emergency phone', placeholder: '+254 ...', value: profileDefaults.emergencyPhone },
+          { name: 'documentStatus', label: 'Document status', placeholder: 'All mandatory files available', value: profileDefaults.documentStatus, full: true },
         ],
         submit(data) {
-          appendModuleRecord('profile', {
-            userId: session.userId,
+          if (!isHr(session)) throw new Error('Only HR can edit employee details.');
+          const user = userById(data.employeeId);
+          if (!user) throw new Error('Employee record was not found.');
+
+          const editable = {
+            name: data.name,
             title: data.title,
-            detail: data.detail,
-            status: data.status,
+            dept: data.department,
+            email: data.email ? data.email.toLowerCase() : '',
+            phone: data.phone,
+            nationalId: data.nationalId,
+            kraPin: data.kraPin,
+            manager: data.manager,
+            employmentType: data.employmentType,
+            startDate: data.startDate,
+            location: data.location,
+            emergencyContact: data.emergencyContact,
+            emergencyPhone: data.emergencyPhone,
+            documentStatus: data.documentStatus,
+          };
+
+          Object.entries(editable).forEach(([key, value]) => {
+            if (String(value || '').trim()) user[key] = String(value).trim();
+          });
+          user.av = initialsFor(user.name);
+
+          appendModuleRecord('profile', {
+            userId: user.id,
+            title: 'Employee details updated',
+            detail: `${user.name}'s profile was updated by HR.`,
+            status: 'Completed',
             context: 'Just now',
           });
-          Session.audit('PROFILE_UPDATE', `${data.title} submitted`);
-          return { message: 'Profile update saved.', refresh: true };
+          window.ASTERAHR.store.persist();
+          Session.audit('PROFILE_EDIT', `${user.name} employee details updated`);
+          return { message: 'Employee details updated.', refresh: true };
         },
       },
       'run-manual-sync': {
@@ -1070,6 +1138,16 @@ const ModulePage = (() => {
           Session.audit('ATS_SYNC', 'Manual sync triggered from ATS page');
           Toast.success('Manual ATS sync started.');
           init();
+        },
+      },
+      'check-in': {
+        invoke() {
+          recordAttendancePunch('in');
+        },
+      },
+      'check-out': {
+        invoke() {
+          recordAttendancePunch('out');
         },
       },
       'submit-correction': {
@@ -1095,6 +1173,9 @@ const ModulePage = (() => {
             dept: session.department || 'General',
             issue: true,
             detail: data.detail,
+            attendanceDate: todayKey(),
+            checkIn: data.event === 'Missed check-in' ? 'Missing' : data.context,
+            checkOut: data.event === 'Missing checkout' ? 'Missing' : 'Pending review',
           });
           Session.audit('ATTENDANCE_CORRECTION', `${data.event} correction submitted`);
           return { message: 'Attendance correction submitted.', refresh: true };
@@ -1123,6 +1204,9 @@ const ModulePage = (() => {
             dept: session.department || 'General',
             issue: true,
             detail: data.detail,
+            attendanceDate: todayKey(),
+            checkIn: data.event === 'Missed check-in' ? 'Missing' : data.context,
+            checkOut: data.event === 'Missing checkout' ? 'Missing' : 'Pending review',
           });
           Session.audit('ATTENDANCE_REQUEST', `${data.event} requested`);
           return { message: 'Correction request created.', refresh: true };
@@ -1341,6 +1425,87 @@ const ModulePage = (() => {
     window.ASTERAHR.store.persist();
   }
 
+  function todayKey() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function shortClockTime(date = new Date()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function hasOpenAttendancePunch(record) {
+    return !!record?.checkIn
+      && !['Not recorded', 'Missing'].includes(record.checkIn)
+      && (!record.checkOut || ['Not recorded', 'Pending review'].includes(record.checkOut));
+  }
+
+  function attendanceDayLabel(record) {
+    if (!record?.attendanceDate) return 'Today';
+    if (record.attendanceDate === todayKey()) return 'Today';
+    return record.attendanceDate;
+  }
+
+  function recordAttendancePunch(direction) {
+    if (window.DashboardTools?.recordAttendancePunch) {
+      window.DashboardTools.recordAttendancePunch(direction);
+      return;
+    }
+
+    const session = Session.get();
+    const records = window.ASTERAHR?.moduleData?.attendance;
+    if (!session || !Array.isArray(records)) return;
+
+    const day = todayKey();
+    const now = shortClockTime();
+    const userRecords = records.filter(item => item.userId === session.userId && !item.issue);
+    const openOvertime = userRecords.find(item => item.attendanceDate !== day && hasOpenAttendancePunch(item));
+    let record = direction === 'out'
+      ? (openOvertime || userRecords.find(item => item.attendanceDate === day))
+      : userRecords.find(item => item.attendanceDate === day);
+
+    if (!record) {
+      record = {
+        userId: session.userId,
+        name: session.name,
+        event: 'Daily attendance',
+        status: 'Checked in',
+        context: 'Today',
+        dept: session.department || 'General',
+        issue: false,
+        attendanceDate: day,
+        checkIn: 'Not recorded',
+        checkOut: 'Not recorded',
+      };
+      records.unshift(record);
+    }
+
+    if (direction === 'in') {
+      record.checkIn = now;
+      record.event = 'Check-in recorded';
+      record.status = record.checkOut && record.checkOut !== 'Not recorded' ? 'Completed' : 'Checked in';
+      Toast.success(`Checked in at ${now}.`);
+      Session.audit('ATTENDANCE_CHECK_IN', `${session.name} checked in at ${now}`);
+    } else {
+      if (!record.checkIn || record.checkIn === 'Not recorded') record.checkIn = 'Missing';
+      record.checkOut = now;
+      record.event = 'Check-out recorded';
+      record.status = 'Completed';
+      Toast.success(`Checked out at ${now}.`);
+      Session.audit('ATTENDANCE_CHECK_OUT', `${session.name} checked out at ${now}`);
+    }
+
+    record.context = `${attendanceDayLabel(record)} - In: ${record.checkIn}; Out: ${record.checkOut}`;
+    window.ASTERAHR.store.persist();
+    init();
+  }
+
+  function htmlEscape(value = '') {
+    return String(value).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+  }
+
   function _users() {
     return window.ASTERAHR?.users || [];
   }
@@ -1390,6 +1555,61 @@ const ModulePage = (() => {
     return _users()
       .filter(user => user.dept === department || user.role === 'manager' && user.dept === department)
       .map(user => user.id);
+  }
+
+  function uniqueDepartments() {
+    return [...new Set(_users().map(user => user.dept).filter(Boolean))].sort();
+  }
+
+  function resolveAnnouncementRecipients(data, session) {
+    const type = data.audienceType || 'Entire organization';
+    if (type === 'Entire organization') return _users().map(user => user.id);
+    if (type === 'Leadership') return _announcementRecipients('Leadership', session?.department);
+    if (type === 'Departments') {
+      const selected = (Array.isArray(data.departments) ? data.departments : String(data.departments || '').split(','))
+        .map(item => String(item).trim().toLowerCase())
+        .filter(Boolean);
+      return _users()
+        .filter(user => selected.includes(String(user.dept || '').toLowerCase()))
+        .map(user => user.id);
+    }
+    if (type === 'Specific employees') {
+      const selected = (Array.isArray(data.employees) ? data.employees : String(data.employees || '').split(','))
+        .map(item => String(item).trim().toLowerCase())
+        .filter(Boolean);
+      return _users()
+        .filter(user => selected.includes(user.id.toLowerCase()) || selected.includes(user.email.toLowerCase()) || selected.includes(user.name.toLowerCase()))
+        .map(user => user.id);
+    }
+    return _announcementRecipients(data.audience || 'All employees', session?.department);
+  }
+
+  function announcementAudienceLabel(record) {
+    if (record.audienceType === 'Departments') return record.departments?.join(', ') || record.audience || 'Departments';
+    if (record.audienceType === 'Specific employees') {
+      const names = (record.targetUserIds || []).map(id => userById(id)?.name).filter(Boolean);
+      return names.length ? names.join(', ') : 'Specific employees';
+    }
+    return record.audience || record.audienceType || 'All employees';
+  }
+
+  function announcementDeliveredCount(record) {
+    if ((record.deliveredTo || []).length) return record.deliveredTo.length;
+    if ((record.targetUserIds || []).length) return record.targetUserIds.length;
+    if (record.public || record.audienceType === 'Entire organization' || record.audience === 'All employees') return _users().length;
+    if ((record.departments || []).length) return _users().filter(user => record.departments.includes(user.dept)).length;
+    if (record.dept) return _users().filter(user => user.dept === record.dept).length;
+    return 0;
+  }
+
+  function canSeeAnnouncement(record, session) {
+    if (!session) return false;
+    if (session.role === 'hr_admin' || session.role === 'hr_officer') return true;
+    if (record.public || record.audienceType === 'Entire organization' || record.audience === 'All employees') return true;
+    if ((record.targetUserIds || []).includes(session.userId)) return true;
+    if ((record.departments || []).includes(session.department) || record.dept === session.department) return true;
+    if (record.audienceType === 'Leadership' && ['manager', 'hr_admin', 'hr_officer'].includes(session.role)) return true;
+    return false;
   }
 
   function downloadTextFile(filename, content) {
@@ -1457,11 +1677,169 @@ const ModulePage = (() => {
     return [String(value), label, meta, tone, icon];
   }
 
+  function isHr(session) {
+    return session?.role === 'hr_admin' || session?.role === 'hr_officer';
+  }
+
+  function userById(id) {
+    return (window.ASTERAHR?.users || []).find(user => user.id === id) || null;
+  }
+
+  function initialsFor(name = '') {
+    return String(name)
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() || '')
+      .join('') || 'U';
+  }
+
+  function profileSubject(session) {
+    const requestedId = new URLSearchParams(window.location.search).get('userId');
+    if (isHr(session) && requestedId && userById(requestedId)) return userById(requestedId);
+    return userById(session.userId) || {
+      id: session.userId,
+      role: session.role,
+      name: session.name,
+      title: session.title,
+      email: session.email,
+      dept: session.department,
+      av: session.avatar,
+      col: session.color,
+    };
+  }
+
+  function profileFallbacks(user) {
+    const department = user.dept || 'Corporate Services';
+    const roleLabel = window.ASTERAHR?.roles?.[user.role]?.label || user.role || 'Employee';
+    return {
+      phone: user.phone || '+254 700 412 0' + String(user.id || '0').slice(-1),
+      nationalId: user.nationalId || `ID-${String(user.id || 'USR-000').replace(/\D/g, '').padStart(6, '0')}`,
+      kraPin: user.kraPin || `A${String(user.id || '000').replace(/\D/g, '').padStart(9, '0')}K`,
+      dob: user.dob || '14 May 1992',
+      address: user.address || 'Nairobi, Kenya',
+      employmentType: user.employmentType || (user.role === 'employee' ? 'Permanent' : 'Full-time leadership'),
+      startDate: user.startDate || (user.role === 'employee' ? '08 Jan 2022' : '03 Mar 2021'),
+      location: user.location || 'Nairobi HQ',
+      workMode: user.workMode || (department === 'Engineering' ? 'Hybrid' : 'On-site'),
+      manager: user.manager || (user.role === 'employee' ? 'Samuel Kariuki' : 'HR Leadership'),
+      grade: user.grade || (user.role === 'employee' ? 'G7' : 'Leadership'),
+      costCenter: user.costCenter || `${department.slice(0, 3).toUpperCase()}-204`,
+      emergencyContact: user.emergencyContact || 'Mary Achieng',
+      emergencyPhone: user.emergencyPhone || '+254 711 208 441',
+      relationship: user.relationship || 'Sibling',
+      bankName: user.bankName || 'KCB Bank Kenya',
+      bankBranch: user.bankBranch || 'Westlands',
+      accountLast4: user.accountLast4 || '4821',
+      nhifStatus: user.nhifStatus || 'Active',
+      nssfStatus: user.nssfStatus || 'Active',
+      documentStatus: user.documentStatus || '1 document request open',
+      roleLabel,
+      department,
+    };
+  }
+
+  function profileSectionsFor(user) {
+    const d = profileFallbacks(user);
+    return [
+      {
+        title: 'Personal Details',
+        sub: 'Identity and contact information',
+        items: [
+          ['Full name', user.name],
+          ['Email address', user.email],
+          ['Phone number', d.phone],
+          ['National ID', d.nationalId],
+          ['KRA PIN', d.kraPin],
+          ['Date of birth', d.dob],
+          ['Home address', d.address],
+        ],
+      },
+      {
+        title: 'Professional Details',
+        sub: 'Role, reporting, and work setup',
+        items: [
+          ['Job title', user.title],
+          ['Role type', d.roleLabel],
+          ['Department', d.department],
+          ['Manager', d.manager],
+          ['Employment type', d.employmentType],
+          ['Start date', d.startDate],
+          ['Work location', d.location],
+          ['Work mode', d.workMode],
+          ['Grade', d.grade],
+          ['Cost center', d.costCenter],
+        ],
+      },
+      {
+        title: 'Emergency & Compliance',
+        sub: 'Contacts, statutory records, and documents',
+        items: [
+          ['Emergency contact', d.emergencyContact],
+          ['Relationship', d.relationship],
+          ['Emergency phone', d.emergencyPhone],
+          ['Bank', d.bankName],
+          ['Bank branch', d.bankBranch],
+          ['Account ending', d.accountLast4],
+          ['NHIF status', d.nhifStatus],
+          ['NSSF status', d.nssfStatus],
+          ['Documents', d.documentStatus],
+        ],
+      },
+    ];
+  }
+
   function profileData(page, session) {
     const records = scopeRecords(recordsFor('profile'), session);
-    if (!records.length) return page;
+    const subject = profileSubject(session);
+    const details = profileFallbacks(subject);
+    const subjectRecords = records.filter(r => r.userId === subject.id);
+    const visibleRecords = subjectRecords.length ? subjectRecords : records;
+    const canEdit = isHr(session);
     return {
       ...page,
+      hero: {
+        ...page.hero,
+        title: subject.id === session.userId ? 'Your employee profile' : `${subject.name}'s employee profile`,
+        text: `${subject.title || details.roleLabel} · ${details.department}`,
+      },
+      spotlight: canEdit
+        ? ['Employee details', 'HR can review and edit the selected employee record from this page.']
+        : ['Profile summary', 'Your details are grouped by personal, professional, emergency, and compliance records.'],
+      stats: [
+        stat('96%', 'Profile completion', `${visibleRecords.length} profile item${visibleRecords.length === 1 ? '' : 's'}`, 'indigo', 'ID'),
+        stat(visibleRecords.filter(r => r.status === 'Pending' || r.status === 'In review').length, 'Open actions', 'Need attention', 'gold', '!'),
+        stat(profileSectionsFor(subject).reduce((sum, section) => sum + section.items.length, 0), 'Detail fields', 'Shown in sections', 'green', 'OK'),
+      ],
+      rows: [
+        ['Personal summary', `${subject.email} · ${details.phone} · ${details.nationalId}`, 'ID'],
+        ['Professional summary', `${subject.title} · ${details.department} · reports to ${details.manager}`, 'JOB'],
+        ['Compliance summary', `${details.kraPin} · NHIF ${details.nhifStatus} · NSSF ${details.nssfStatus}`, 'DOC'],
+      ],
+      actions: [
+        ...(canEdit ? [['Edit employee details', 'action:update-profile']] : []),
+        ['View payslips', 'modules/payroll/payslips.html'],
+        ['Open documents', 'modules/documents/repository.html'],
+      ],
+      chips: canEdit
+        ? ['HR-editable record', 'Personal details', 'Professional details', 'Compliance details']
+        : ['Read-only summary', 'Personal details', 'Professional details', 'Emergency contacts'],
+      tableRows: visibleRecords.slice(0, 4).map(r => [r.title, r.detail, r.status, r.context]),
+      _profileSubject: subject,
+      _profileSections: profileSectionsFor(subject),
+      _profileCanEdit: canEdit,
+      _profileUsers: isHr(session) ? window.ASTERAHR.users : [],
+    };
+    return {
+      ...page,
+      hero: {
+        ...page.hero,
+        title: subject.id === session.userId ? 'Your employee profile' : `${subject.name}'s employee profile`,
+        text: `${subject.title || details.roleLabel} · ${details.department}`,
+      },
+      spotlight: canEdit
+        ? ['Employee details', 'HR can review and edit the selected employee record from this page.']
+        : ['Profile summary', 'Your details are grouped by personal, professional, emergency, and compliance records.'],
       stats: [
         stat(records.length, 'Profile items', 'Visible to you', 'indigo', '🧾'),
         stat(records.filter(r => r.status === 'Pending' || r.status === 'In review').length, 'Open actions', 'Need attention', 'gold', '⚠'),
@@ -1473,17 +1851,25 @@ const ModulePage = (() => {
   }
 
   function announcementsData(page, session) {
-    const records = scopeRecords(recordsFor('announcements'), session);
+    const source = recordsFor('announcements');
+    const records = source
+      .map((record, idx) => ({ ...record, _idx: idx }))
+      .filter(record => canSeeAnnouncement(record, session));
     if (!records.length) return page;
+    const canManage = RBAC.can(session.role, 'announcements', 'edit') || RBAC.can(session.role, 'announcements', 'delete');
     return {
       ...page,
       stats: [
         stat(records.length, 'Visible announcements', 'Filtered by access', 'rose', '📢'),
         stat(records.filter(r => r.status === 'Delivered').length, 'Delivered', 'Already published', 'blue', '✓'),
-        stat(records.filter(r => r.status !== 'Delivered').length, 'Upcoming items', 'Draft or scheduled', 'gold', '📌'),
+        stat(records.filter(r => r.requiresAction || r.status === 'Needs approval').length, 'Need action', 'Approval or acknowledgement', 'gold', '📌'),
       ],
       rows: records.slice(0, 3).map(r => [r.title, r.detail, '📣']),
-      tableRows: records.slice(0, 3).map(r => [r.title, r.audience, r.status, r.context]),
+      tableColumns: ['Announcement', 'Receivers', 'Delivery', 'Actions'],
+      tableRows: records.map(r => [r.title, announcementAudienceLabel(r), r.status, r.context]),
+      _announcementRecords: records,
+      _announcementCanManage: canManage,
+      _announcementSession: session,
     };
   }
 
@@ -1516,6 +1902,7 @@ const ModulePage = (() => {
       tableRows: records.slice(0, 3).map(r => [r.name, r.event, r.status, r.context]),
       _attendanceRecords: records,
       _attendanceApprover: ['hr_admin', 'hr_officer', 'manager'].includes(session.role),
+      _attendanceHrView: ['hr_admin', 'hr_officer'].includes(session.role),
     };
   }
 
@@ -2006,10 +2393,55 @@ const ModulePage = (() => {
     },
   ];
 
-  function _enrolmentStatus(courseId, session) {
+  function _courseTitleMatchesRecord(course, record) {
+    const recordCourse = String(record.course || '').toLowerCase();
+    const title = String(course.title || '').toLowerCase();
+    return !!recordCourse && (recordCourse === title || title.includes(recordCourse) || recordCourse.includes(title.split('&')[0].trim()));
+  }
+
+  function _enrolmentRecord(course, session) {
     const records = window.ASTERAHR?.moduleData?.training || [];
-    const match = records.find(r => r.courseId === courseId && r.userId === session.userId);
+    return records.find(r => r.userId === session.userId && (r.courseId === course.id || _courseTitleMatchesRecord(course, r))) || null;
+  }
+
+  function _enrolmentStatus(courseId, session) {
+    const course = COURSE_CATALOGUE.find(c => c.id === courseId) || { id: courseId, title: courseId };
+    const match = _enrolmentRecord(course, session);
     return match ? match.status : null;
+  }
+
+  function _courseProgressValue(record) {
+    if (!record) return null;
+    if (Number.isFinite(Number(record.progress))) return Math.max(0, Math.min(100, Number(record.progress)));
+    const map = {
+      'Bookmarked': 0,
+      'Open': 10,
+      'Scheduled': 25,
+      'In progress': 60,
+      'Completed': 100,
+    };
+    return map[record.status] ?? 0;
+  }
+
+  function _renderCourseProgress(record) {
+    const progress = _courseProgressValue(record);
+    if (progress === null) return '';
+    const label = record.status === 'Completed'
+      ? 'Completed'
+      : record.status === 'Bookmarked'
+        ? 'Bookmarked'
+        : `${progress}% complete`;
+    return `
+      <div class="training-enrolment-progress">
+        <div class="training-enrolment-progress-head">
+          <span>Enrollment progress</span>
+          <strong>${label}</strong>
+        </div>
+        <div class="training-enrolment-progress-track">
+          <div class="training-enrolment-progress-fill" style="width:${progress}%"></div>
+        </div>
+      </div>
+    `;
   }
 
   function _trainingStatusChip(status) {
@@ -2098,6 +2530,7 @@ const ModulePage = (() => {
           </div>
           <div class="training-course-body">
             <div style="font-size:12px;color:var(--ink-s);line-height:1.6;flex:1">${course.description}</div>
+            ${_renderCourseProgress(_enrolmentRecord(course, session))}
             <div class="training-course-meta">
               <span style="font-size:11.5px;color:var(--ink-mu)">📂 ${course.category}</span>
               <span style="font-size:11.5px;color:var(--ink-mu)">⏱ ${course.duration}</span>
@@ -2124,11 +2557,15 @@ const ModulePage = (() => {
         <div class="modal admin-modal training-catalogue-modal">
           <div class="admin-modal-hero training-catalogue-hero">
             <div>
-              <div class="module-eyebrow" style="color:rgba(255,255,255,.7)">Learning Studio</div>
-              <h2 style="color:#fff">${isEmployee ? 'My Training Catalogue' : isManager ? 'Team Learning Catalogue' : 'Course Catalogue'}</h2>
-              <p style="color:rgba(255,255,255,.88);font-size:13.5px">${isEmployee ? 'Browse curated courses, complete required learning, and keep your development moving.' : isManager ? 'Guide your team through learning paths, required modules, and development opportunities.' : 'Oversee the company learning library, required compliance tracks, and enrolment demand.'}</p>
+              <div class="module-eyebrow training-catalogue-eyebrow">Learning Studio</div>
+              <h2 class="training-catalogue-title">${isEmployee ? 'My Training Catalogue' : isManager ? 'Team Learning Catalogue' : 'Course Catalogue'}</h2>
+              <p class="training-catalogue-copy">${isEmployee ? 'Browse curated courses, complete required learning, and keep your development moving.' : isManager ? 'Guide your team through learning paths, required modules, and development opportunities.' : 'Oversee the company learning library, required compliance tracks, and enrolment demand.'}</p>
             </div>
-            <div class="admin-modal-hero-badge"><span>${COURSE_CATALOGUE.length}</span><strong>Learning paths live</strong><div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,.78)">Courses, pathways, and completion tracking</div></div>
+            <div class="admin-modal-hero-badge training-catalogue-badge">
+              <span>${COURSE_CATALOGUE.length}</span>
+              <strong>Learning paths live</strong>
+              <small>Courses, pathways, and completion tracking</small>
+            </div>
           </div>
           <div class="modal-head admin-modal-head">
             <button class="modal-close" onclick="closeModal('training-catalogue-modal')">✕</button>
@@ -2202,11 +2639,13 @@ const ModulePage = (() => {
   function _mutateCourseRecord(courseId, session, mutate) {
     const records = window.ASTERAHR?.moduleData?.training;
     if (!records) return;
-    const existing = records.find(r => r.courseId === courseId && r.userId === session.userId);
+    const course = COURSE_CATALOGUE.find(c => c.id === courseId);
+    const existing = course ? _enrolmentRecord(course, session) : records.find(r => r.courseId === courseId && r.userId === session.userId);
     if (existing) {
+      existing.courseId = courseId;
+      existing.course = course?.title || existing.course || courseId;
       mutate(existing);
     } else {
-      const course = COURSE_CATALOGUE.find(c => c.id === courseId);
       const newRecord = {
         userId: session.userId,
         name: session.name,
@@ -2216,6 +2655,7 @@ const ModulePage = (() => {
         context: 'Just enrolled',
         dept: session.department || 'General',
         required: course?.required || false,
+        progress: 25,
       };
       mutate(newRecord);
       records.unshift(newRecord);
@@ -2242,6 +2682,7 @@ const ModulePage = (() => {
     _mutateCourseRecord(courseId, session, r => {
       r.status = 'Scheduled';
       r.context = 'Just enrolled';
+      r.progress = Math.max(Number(r.progress) || 0, 25);
     });
     const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_ENROL', `Enrolled in ${course?.title || courseId}`);
@@ -2271,6 +2712,7 @@ const ModulePage = (() => {
     _mutateCourseRecord(courseId, session, r => {
       r.status = 'Bookmarked';
       r.context = 'Bookmarked for later';
+      r.progress = 0;
     });
     const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_BOOKMARK', `Bookmarked ${course?.title || courseId}`);
@@ -2283,10 +2725,11 @@ const ModulePage = (() => {
     const session = _trainingSession || Session.get();
     const records = window.ASTERAHR?.moduleData?.training;
     if (!records) return;
-    const idx = records.findIndex(r => r.courseId === courseId && r.userId === session.userId);
+    const course = COURSE_CATALOGUE.find(c => c.id === courseId);
+    const match = course ? _enrolmentRecord(course, session) : null;
+    const idx = records.findIndex(r => r === match || (r.courseId === courseId && r.userId === session.userId));
     if (idx !== -1) records.splice(idx, 1);
     window.ASTERAHR.store.persist();
-    const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_WITHDRAW', `Withdrew from ${course?.title || courseId}`);
     Toast.warning(`Withdrawn from ${course?.title || 'course'}.`);
     _refreshCatalogueModal();
@@ -2299,6 +2742,7 @@ const ModulePage = (() => {
       r.status = 'Completed';
       r.context = 'Completed just now';
       r.completedAt = new Date().toISOString();
+      r.progress = 100;
     });
     const course = COURSE_CATALOGUE.find(c => c.id === courseId);
     Session.audit('TRAINING_COMPLETE', `Completed ${course?.title || courseId}`);
@@ -2679,9 +3123,64 @@ const ModulePage = (() => {
         <label class="admin-field ${field.full ? 'admin-field-lg' : ''}">
           <span class="admin-field-label">${field.label}</span>
           <select name="${field.name}" ${field.required ? 'required' : ''}>
-            ${(field.options || []).map(option => `<option value="${option}">${option}</option>`).join('')}
+            ${(field.options || []).map(option => {
+              const value = typeof option === 'object' ? option.value : option;
+              const label = typeof option === 'object' ? option.label : option;
+              return `<option value="${value}" ${String(field.value || '') === String(value) ? 'selected' : ''}>${label}</option>`;
+            }).join('')}
           </select>
         </label>
+      `;
+    }
+
+    if (field.type === 'multiselect') {
+      const selected = Array.isArray(field.value) ? field.value.map(String) : String(field.value || '').split(',').map(item => item.trim());
+      return `
+        <label class="admin-field ${field.full ? 'admin-field-lg' : ''}">
+          <span class="admin-field-label">${field.label}</span>
+          <select name="${field.name}" multiple size="${Math.min(Math.max((field.options || []).length, 3), 6)}" ${field.required ? 'required' : ''}>
+            ${(field.options || []).map(option => {
+              const value = typeof option === 'object' ? option.value : option;
+              const label = typeof option === 'object' ? option.label : option;
+              return `<option value="${value}" ${selected.includes(String(value)) ? 'selected' : ''}>${label}</option>`;
+            }).join('')}
+          </select>
+          ${field.help ? `<span style="font-size:11.5px;color:var(--ink-mu);line-height:1.45">${field.help}</span>` : ''}
+        </label>
+      `;
+    }
+
+    if (field.type === 'dropdownMulti') {
+      const selected = Array.isArray(field.value) ? field.value.map(String) : String(field.value || '').split(',').map(item => item.trim()).filter(Boolean);
+      const selectedSet = new Set(selected);
+      const options = (field.options || []).map(option => {
+        const value = typeof option === 'object' ? option.value : option;
+        const label = typeof option === 'object' ? option.label : option;
+        const dept = typeof option === 'object' ? option.dept : '';
+        return `
+          <label class="workflow-dropdown-option" data-dept="${htmlEscape(dept || '')}">
+            <input type="checkbox" value="${htmlEscape(value)}" ${selectedSet.has(String(value)) ? 'checked' : ''} onchange="ModulePage.syncWorkflowDropdown('${field.name}')"/>
+            <span>${htmlEscape(label)}</span>
+          </label>
+        `;
+      }).join('');
+      return `
+        <div class="admin-field ${field.full ? 'admin-field-lg' : ''}" data-dropdown-field="${field.name}">
+          <span class="admin-field-label">${field.label}</span>
+          <input type="hidden" name="${field.name}" value="${htmlEscape(selected.join(','))}" ${field.required ? 'required' : ''}/>
+          <div class="workflow-dropdown">
+            <button class="workflow-dropdown-trigger" type="button" onclick="ModulePage.toggleWorkflowDropdown('${field.name}')">
+              <span data-dropdown-summary>${selected.length ? `${selected.length} selected` : 'Choose options'}</span>
+            </button>
+            <div class="workflow-dropdown-menu">
+              <div class="workflow-dropdown-options">
+                ${options}
+                <span class="workflow-dropdown-empty">No employees in the selected department.</span>
+              </div>
+            </div>
+          </div>
+          ${field.help ? `<span class="workflow-field-help">${field.help}</span>` : ''}
+        </div>
       `;
     }
 
@@ -2767,11 +3266,15 @@ const ModulePage = (() => {
     }
 
     if (page._attendanceRecords) {
-      return renderAttendanceTableRows(page._attendanceRecords, page._attendanceApprover);
+      return renderAttendanceTableRows(page._attendanceRecords, page._attendanceApprover, page._attendanceHrView);
     }
 
     if (page._docRecords) {
       return renderDocTableRows(page._docRecords, page._docSession);
+    }
+
+    if (page._announcementRecords) {
+      return renderAnnouncementTableRows(page._announcementRecords, page._announcementCanManage, page._announcementSession);
     }
 
     return (page.tableRows || []).map(cols => `
@@ -2790,6 +3293,49 @@ const ModulePage = (() => {
     };
     const s = map[status] || { bg: 'var(--bdr-s)', color: 'var(--ink-s)', label: status };
     return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:${s.bg};color:${s.color}">${s.label}</span>`;
+  }
+
+  function renderAnnouncementStatus(record, session) {
+    const delivered = announcementDeliveredCount(record);
+    const viewed = (record.viewedBy || []).length;
+    const replied = (record.replies || []).length;
+    const actioned = (record.actionedBy || []).length;
+    const userViewed = (record.viewedBy || []).includes(session?.userId);
+    return `
+      <div class="announcement-delivery">
+        <strong>${record.status || 'Draft'}</strong>
+        <span>${delivered} delivered · ${viewed} viewed · ${replied} replies${record.requiresAction ? ` · ${actioned} actioned` : ''}</span>
+        ${record.requiresAction ? `<span>Action: ${htmlEscape(record.actionLabel || 'Action required')}</span>` : ''}
+        <span>${userViewed ? 'Viewed by you' : 'Unread for you'}</span>
+      </div>
+    `;
+  }
+
+  function renderAnnouncementTableRows(records, canManage, session) {
+    return records.map(record => {
+      const canApprove = (record.status === 'Needs approval') && RBAC.can(session.role, 'announcements', 'approve');
+      const canEdit = canManage && RBAC.can(session.role, 'announcements', 'edit');
+      const canDelete = canManage && RBAC.can(session.role, 'announcements', 'delete');
+      return `
+        <tr>
+          <td>
+            <strong style="display:block;color:var(--ink);font-size:13px">${htmlEscape(record.title)}</strong>
+            <span style="display:block;color:var(--ink-mu);font-size:11.5px;margin-top:3px">${htmlEscape(record.detail)}</span>
+          </td>
+          <td>${htmlEscape(announcementAudienceLabel(record))}</td>
+          <td>${renderAnnouncementStatus(record, session)}</td>
+          <td>
+            <div class="announcement-row-actions">
+              <button class="btn btn-outline btn-sm" onclick="ModulePage.openAnnouncement(${record._idx})">Open</button>
+              ${record.requiresAction ? `<button class="btn btn-green btn-sm" onclick="ModulePage.actionAnnouncement(${record._idx})">${htmlEscape(record.actionLabel || 'Action')}</button>` : ''}
+              ${canApprove ? `<button class="btn btn-green btn-sm" onclick="ModulePage.approveAnnouncement(${record._idx})">Approve</button>` : ''}
+              ${canEdit ? `<button class="btn btn-outline btn-sm" onclick="ModulePage.editAnnouncement(${record._idx})">Edit</button>` : ''}
+              ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="ModulePage.deleteAnnouncement(${record._idx})">Delete</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   function renderLeaveTableRows(records, canApprove) {
@@ -2837,7 +3383,8 @@ const ModulePage = (() => {
     const isDoc   = !!page._docRecords;
 
     const columns = isLeave ? ['Employee', 'Type', 'Duration', 'Status', 'Context']
-                  : isAtt   ? ['Employee', 'Event', 'Status', 'Context', 'Department']
+                  : isAtt && page._attendanceHrView ? ['Employee', 'Event', 'Day', 'Check in', 'Check out', 'Status', 'Context', 'Department']
+                  : isAtt   ? ['Employee', 'Event', 'Day', 'Status', 'Context', 'Department']
                   : isDoc   ? ['Document', 'Type', 'Status', 'Access Scope', '']
                   : tableColumns(page);
 
@@ -2909,6 +3456,7 @@ const ModulePage = (() => {
         </div>
       </section>
       <section class="module-stat-grid three-up">${renderStats(page.stats)}</section>
+      ${renderAnnouncementBoard(page)}
       <section class="module-layout-grid">
         <div class="card bulletin-card">
           <div class="card-head">
@@ -2955,6 +3503,50 @@ const ModulePage = (() => {
     `;
   }
 
+  function renderProfileDirectory(page) {
+    if (!page._profileCanEdit || !page._profileUsers?.length) return '';
+    const currentId = page._profileSubject?.id;
+    return `
+      <div class="card profile-directory-card">
+        <div class="card-head">
+          <div>
+            <h3>Employee Record</h3>
+            <div class="card-sub">Switch the employee profile HR is reviewing</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <select class="profile-employee-select" onchange="window.location.href='?userId=' + this.value">
+            ${page._profileUsers.map(user => `<option value="${user.id}" ${user.id === currentId ? 'selected' : ''}>${user.name} · ${user.title}</option>`).join('')}
+          </select>
+          <button class="btn btn-navy btn-sm" style="margin-top:12px;width:100%" onclick="ModulePage.handleAction(event, 'update-profile')">Edit Selected Employee</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProfileSections(page) {
+    return (page._profileSections || []).map(section => `
+      <div class="card profile-section-card">
+        <div class="card-head">
+          <div>
+            <h3>${section.title}</h3>
+            <div class="card-sub">${section.sub}</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="profile-detail-grid">
+            ${section.items.map(([label, value]) => `
+              <div class="profile-detail-item">
+                <span>${label}</span>
+                <strong>${value || 'Not recorded'}</strong>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
   function renderProfile(page) {
     return `
       <section class="module-hero profile-hero">
@@ -2968,6 +3560,7 @@ const ModulePage = (() => {
         </div>
         <div class="profile-stat-strip">${renderStats(page.stats)}</div>
       </section>
+      ${renderProfileDirectory(page)}
       <section class="module-layout-grid">
         <div class="card profile-detail-card">
           <div class="card-head">
@@ -2982,7 +3575,30 @@ const ModulePage = (() => {
         </div>
         ${renderCommonSide(page)}
       </section>
+      <section class="profile-sections-grid">${renderProfileSections(page)}</section>
       ${renderTable(page)}
+    `;
+  }
+
+  function renderAnnouncementBoard(page) {
+    if (!page._announcementRecords) return '';
+    return `
+      <section class="announcement-board">
+        ${page._announcementRecords.slice(0, 4).map(record => `
+          <article class="announcement-card">
+            <div class="announcement-card-head">
+              <span class="badge ${record.status === 'Delivered' ? 'badge-green' : record.status === 'Needs approval' ? 'badge-gold' : 'badge-blue'}">${htmlEscape(record.status || 'Draft')}</span>
+              <span>${htmlEscape(announcementAudienceLabel(record))}</span>
+            </div>
+            <h3>${htmlEscape(record.title)}</h3>
+            <p>${htmlEscape(record.detail)}</p>
+            <div class="announcement-card-foot">
+              <span>${(record.viewedBy || []).length} viewed · ${(record.replies || []).length} replies</span>
+              <button class="btn btn-outline btn-sm" onclick="ModulePage.openAnnouncement(${record._idx})">Open</button>
+            </div>
+          </article>
+        `).join('')}
+      </section>
     `;
   }
 
@@ -3505,6 +4121,63 @@ const ModulePage = (() => {
       </div>
     `;
     openModal('workflow-modal');
+    setupWorkflowDropdowns();
+  }
+
+  function workflowDropdownField(name) {
+    return document.querySelector(`#workflow-form [data-dropdown-field="${name}"]`);
+  }
+
+  function toggleWorkflowDropdown(name) {
+    const field = workflowDropdownField(name);
+    if (!field) return;
+    document.querySelectorAll('#workflow-form [data-dropdown-field].is-open').forEach(openField => {
+      if (openField !== field) openField.classList.remove('is-open');
+    });
+    field.classList.toggle('is-open');
+  }
+
+  function syncWorkflowDropdown(name) {
+    const field = workflowDropdownField(name);
+    if (!field) return;
+    const checked = [...field.querySelectorAll('.workflow-dropdown-option:not(.is-hidden) input:checked')];
+    const values = checked.map(input => input.value);
+    const labels = checked.map(input => input.closest('.workflow-dropdown-option')?.querySelector('span')?.textContent || input.value);
+    field.querySelector('input[type="hidden"]').value = values.join(',');
+    field.querySelector('[data-dropdown-summary]').textContent = labels.length
+      ? (labels.length > 2 ? `${labels.length} selected` : labels.join(', '))
+      : 'Choose options';
+    if (name === 'departments') filterAnnouncementEmployeeDropdown();
+  }
+
+  function filterAnnouncementEmployeeDropdown() {
+    if (_workflowAction !== 'create-announcement') return;
+    const departmentField = workflowDropdownField('departments');
+    const employeeField = workflowDropdownField('employees');
+    if (!departmentField || !employeeField) return;
+
+    const selectedDepartments = new Set(
+      [...departmentField.querySelectorAll('.workflow-dropdown-option input:checked')]
+        .map(input => input.value)
+        .filter(Boolean)
+    );
+    let visible = 0;
+    employeeField.querySelectorAll('.workflow-dropdown-option').forEach(option => {
+      const dept = option.dataset.dept || '';
+      const show = !selectedDepartments.size || selectedDepartments.has(dept);
+      option.classList.toggle('is-hidden', !show);
+      if (!show) option.querySelector('input').checked = false;
+      if (show) visible += 1;
+    });
+    employeeField.querySelector('.workflow-dropdown-empty')?.classList.toggle('is-visible', visible === 0);
+    syncWorkflowDropdown('employees');
+  }
+
+  function setupWorkflowDropdowns() {
+    document.querySelectorAll('#workflow-form [data-dropdown-field]').forEach(field => {
+      syncWorkflowDropdown(field.dataset.dropdownField);
+    });
+    filterAnnouncementEmployeeDropdown();
   }
 
   function submitWorkflow() {
@@ -3531,6 +4204,151 @@ const ModulePage = (() => {
     } catch (error) {
       Toast.error(error.message || 'Could not complete this workflow.');
     }
+  }
+
+  function announcementAt(idx) {
+    return window.ASTERAHR?.moduleData?.announcements?.[idx] || null;
+  }
+
+  function saveAnnouncements() {
+    window.ASTERAHR.store.persist();
+  }
+
+  function openAnnouncement(idx) {
+    const record = announcementAt(idx);
+    const session = Session.get();
+    if (!record || !session) return;
+    record.viewedBy = [...new Set([...(record.viewedBy || []), session.userId])];
+    saveAnnouncements();
+
+    let modal = document.getElementById('announcement-open-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'announcement-open-modal';
+      modal.className = 'modal-overlay';
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div class="modal" style="max-width:680px">
+        <div class="modal-head">
+          <div>
+            <h2 style="font-family:var(--f-serif);font-size:24px">${htmlEscape(record.title)}</h2>
+            <div class="card-sub">${htmlEscape(announcementAudienceLabel(record))} · ${htmlEscape(record.status || 'Draft')}</div>
+          </div>
+          <button class="modal-x" type="button" onclick="closeModal('announcement-open-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:14px;line-height:1.7;color:var(--ink-s);margin-bottom:18px">${htmlEscape(record.detail)}</p>
+          <div class="announcement-modal-meta">
+            <span>${announcementDeliveredCount(record)} delivered</span>
+            <span>${(record.viewedBy || []).length} viewed</span>
+            <span>${(record.replies || []).length} replies</span>
+            ${record.requiresAction ? `<span>${(record.actionedBy || []).length} actioned · ${htmlEscape(record.actionLabel || 'Action required')}</span>` : ''}
+          </div>
+          <label class="admin-field admin-field-lg" style="margin-top:18px">
+            <span class="admin-field-label">Reply</span>
+            <textarea id="announcement-reply-text" placeholder="Write a short reply or confirmation note."></textarea>
+          </label>
+          <div class="announcement-replies">
+            ${(record.replies || []).map(reply => `
+              <div class="announcement-reply">
+                <strong>${htmlEscape(reply.name || 'Employee')}</strong>
+                <span>${htmlEscape(reply.text)}</span>
+              </div>
+            `).join('') || '<span style="font-size:12px;color:var(--ink-mu)">No replies yet.</span>'}
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:10px">
+          ${record.requiresAction ? `<button class="btn btn-green btn-sm" onclick="ModulePage.actionAnnouncement(${idx})">${htmlEscape(record.actionLabel || 'Mark Action Taken')}</button>` : ''}
+          <button class="btn btn-navy btn-sm" onclick="ModulePage.replyAnnouncement(${idx})">Send Reply</button>
+        </div>
+      </div>
+    `;
+    openModal('announcement-open-modal');
+    init();
+  }
+
+  function replyAnnouncement(idx) {
+    const record = announcementAt(idx);
+    const session = Session.get();
+    const text = document.getElementById('announcement-reply-text')?.value.trim();
+    if (!record || !session || !text) {
+      Toast.warning('Write a reply first.');
+      return;
+    }
+    record.replies = [...(record.replies || []), { userId: session.userId, name: session.name, text, at: new Date().toISOString() }];
+    Session.audit('ANNOUNCEMENT_REPLY', `${session.name} replied to ${record.title}`);
+    saveAnnouncements();
+    closeModal('announcement-open-modal');
+    Toast.success('Reply sent.');
+    init();
+  }
+
+  function actionAnnouncement(idx) {
+    const record = announcementAt(idx);
+    const session = Session.get();
+    if (!record || !session) return;
+    record.actionedBy = [...new Set([...(record.actionedBy || []), session.userId])];
+    record.viewedBy = [...new Set([...(record.viewedBy || []), session.userId])];
+    Session.audit('ANNOUNCEMENT_ACTIONED', `${session.name} actioned ${record.title}`);
+    saveAnnouncements();
+    closeModal('announcement-open-modal');
+    Toast.success('Action recorded.');
+    init();
+  }
+
+  function approveAnnouncement(idx) {
+    const record = announcementAt(idx);
+    const session = Session.get();
+    if (!record || !RBAC.can(session.role, 'announcements', 'approve')) return;
+    record.status = 'Delivered';
+    record.approvedBy = session.userId;
+    record.deliveredTo = record.deliveredTo?.length
+      ? record.deliveredTo
+      : (record.targetUserIds?.length ? record.targetUserIds : resolveAnnouncementRecipients({ ...record, departments: (record.departments || []).join(', ') }, session));
+    Session.audit('ANNOUNCEMENT_APPROVED', `${record.title} approved`);
+    _notifyUsers(record.deliveredTo, {
+      type: 'announcement',
+      title: record.title,
+      msg: record.detail,
+      href: 'modules/announcements/board.html',
+      actor: session.name,
+    });
+    saveAnnouncements();
+    Toast.success('Announcement approved and delivered.');
+    init();
+  }
+
+  function editAnnouncement(idx) {
+    const record = announcementAt(idx);
+    const session = Session.get();
+    if (!record || !RBAC.can(session.role, 'announcements', 'edit')) return;
+    const title = prompt('Announcement title', record.title);
+    if (title === null) return;
+    const detail = prompt('Message', record.detail);
+    if (detail === null) return;
+    const status = prompt('Status: Draft, Scheduled, Delivered, Needs approval', record.status || 'Draft');
+    if (status === null) return;
+    record.title = title.trim() || record.title;
+    record.detail = detail.trim() || record.detail;
+    record.status = status.trim() || record.status;
+    Session.audit('ANNOUNCEMENT_EDIT', `${record.title} edited`);
+    saveAnnouncements();
+    Toast.success('Announcement updated.');
+    init();
+  }
+
+  function deleteAnnouncement(idx) {
+    const session = Session.get();
+    if (!RBAC.can(session.role, 'announcements', 'delete')) return;
+    showConfirm('Delete announcement?', 'This removes the announcement from the demo feed.', () => {
+      const record = announcementAt(idx);
+      window.ASTERAHR.moduleData.announcements.splice(idx, 1);
+      Session.audit('ANNOUNCEMENT_DELETE', `${record?.title || 'Announcement'} deleted`);
+      saveAnnouncements();
+      Toast.warning('Announcement deleted.');
+      init();
+    });
   }
 
   function init() {
@@ -3658,18 +4476,29 @@ const ModulePage = (() => {
     return `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:${s.bg};color:${s.color}">${status}</span>`;
   }
 
-  function renderAttendanceTableRows(records, canApprove) {
+  function attendanceTime(record, key) {
+    if (record[key]) return record[key];
+    if (key === 'checkIn' && /check-in|arrival/i.test(record.event || '')) return record.status || record.context || 'Not recorded';
+    if (key === 'checkOut' && /checkout/i.test(record.event || record.context || '')) return record.issue ? 'Missing' : (record.status || 'Not recorded');
+    return record.issue ? 'Pending review' : 'Not recorded';
+  }
+
+  function renderAttendanceTableRows(records, canApprove, showTimes) {
     return records.map((r, idx) => {
       const isPending = r.issue && (r.status === 'Pending' || r.status === 'Open');
       const detailId = `att-detail-${idx}`;
+      const detailColspan = showTimes ? 8 : 6;
+      const timeCells = showTimes
+        ? `<td>${attendanceTime(r, 'checkIn')}</td><td>${attendanceTime(r, 'checkOut')}</td>`
+        : '';
 
       const approverRow = (canApprove && isPending) ? `
         <tr id="${detailId}" style="display:none;background:var(--parch)">
-          <td colspan="5" style="padding:0">
+          <td colspan="${detailColspan}" style="padding:0">
             <div style="padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid var(--bdr-s)">
               <div style="font-size:13px;color:var(--ink-s);line-height:1.6">
                 <strong style="color:var(--ink);display:block;margin-bottom:2px">${r.name} · ${r.event}</strong>
-                ${r.context}${r.detail ? ` — ${r.detail}` : ''}
+                ${attendanceDayLabel(r)} · ${r.context}${showTimes ? ` · In: ${attendanceTime(r, 'checkIn')} · Out: ${attendanceTime(r, 'checkOut')}` : ''}${r.detail ? ` - ${r.detail}` : ''}
               </div>
               <div style="display:flex;gap:8px;flex-shrink:0">
                 <button class="btn btn-green btn-sm" onclick="ModulePage.approveAttendance(${idx})">✓ Resolve</button>
@@ -3691,6 +4520,8 @@ const ModulePage = (() => {
         <tr ${clickAttr} style="${rowStyle}">
           <td>${r.name || '—'}</td>
           <td>${issueIcon} ${r.event || '—'}</td>
+          <td>${attendanceDayLabel(r)}</td>
+          ${timeCells}
           <td>${_attendanceStatusBadge(r.status, r.issue)}</td>
           <td>${r.context || '—'}</td>
           <td>${r.dept || 'General'}${(canApprove && isPending) ? ' <span style="font-size:11px;color:var(--ink-mu)">▾</span>' : ''}</td>
@@ -3733,7 +4564,7 @@ const ModulePage = (() => {
   function _refreshAttendanceTable() {
     if (!_currentAttRecords) return;
     const tbody = document.getElementById('att-table-body');
-    if (tbody) tbody.innerHTML = renderAttendanceTableRows(_currentAttRecords, _currentAttApprover);
+    if (tbody) tbody.innerHTML = renderAttendanceTableRows(_currentAttRecords, _currentAttApprover, ['hr_admin', 'hr_officer'].includes(Session.get()?.role));
   }
 
   function toggleAttendanceRow(detailId) {
@@ -4429,6 +5260,8 @@ const ModulePage = (() => {
     placeholder,
     handleAction,
     submitWorkflow,
+    toggleWorkflowDropdown,
+    syncWorkflowDropdown,
     openEmployeeModal,
     submitEmployee,
     openRoleModal,
@@ -4444,6 +5277,12 @@ const ModulePage = (() => {
     approveAttendance,
     rejectAttendance,
     confirmRejectAttendance,
+    openAnnouncement,
+    replyAnnouncement,
+    actionAnnouncement,
+    approveAnnouncement,
+    editAnnouncement,
+    deleteAnnouncement,
     openSelfReview,
     openManagerReview,
     openManagerReviewForm,
