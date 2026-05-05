@@ -1,7 +1,7 @@
 /**
  * AsteraHR ERP - Mock Data (data/mock-data.js)
- * Single source of truth for all demo data.
- * Replace with real API calls in production.
+ * Single source of demo data.
+ * To be replaced with real API calls in production.
  */
 
 const ASTERAHR = {
